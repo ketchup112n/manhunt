@@ -1,0 +1,14 @@
+{
+  "name": "manhunt",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @manhunt/web",
+    "build": "npm run build -w @manhunt/web",
+    "lint": "npm run lint -w @manhunt/web",
+    "typecheck": "npm run typecheck -w @manhunt/web"
+  }
+}
