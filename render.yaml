@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: manhunt
+    runtime: node
+    plan: free
+    branch: feature/shrinking-zone
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: MANHUNT_DEV_PINS
+        value: "false"
+      - key: NODE_VERSION
+        value: "22.18.0"
