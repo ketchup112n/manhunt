@@ -52,6 +52,27 @@ NODE_ENV=production npm start
 
 The server serves `apps/web/dist` and falls back to `index.html` for client routes.
 
+### Test from other devices
+
+The server binds to `0.0.0.0`, so phones on the same Wi-Fi can use your LAN IP directly. To test over the internet without deploying, expose the single server port with a Cloudflare quick tunnel:
+
+```bash
+npm run build
+MANHUNT_DEV_PINS=true npm start            # terminal 1: app + API on :8787
+cloudflared tunnel --url http://localhost:8787   # terminal 2
+```
+
+Open the printed `https://….trycloudflare.com` URL on each device and share the lobby code. WebSockets work over the tunnel without extra configuration.
+
+Caveats:
+
+- The tunnel only lives while `cloudflared` and the server are running, and your machine stays awake.
+- Quick tunnel URLs change every time you restart the tunnel.
+- `MANHUNT_DEV_PINS=true` exposes every runner PIN to the dev console, so only use it for testing.
+- Lobbies are in memory; restarting the server clears them.
+
+Cloudflare Pages can host the static build, but it cannot run the Node WebSocket server this app needs. Point Pages at a separately hosted server, or port the lobby to Workers + Durable Objects, before using it as a real deployment.
+
 ## Stack
 
 - React 19 + React Router 7
