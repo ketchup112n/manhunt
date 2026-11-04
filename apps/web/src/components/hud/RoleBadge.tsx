@@ -1,4 +1,4 @@
-import { Crosshair, Rabbit } from "lucide-react";
+import { CircleDashed, Crosshair, Rabbit } from "lucide-react";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -14,7 +14,9 @@ export function RoleBadge({
   compact?: boolean;
 }) {
   const isHunter = role === "hunter";
-  const Icon = isHunter ? Crosshair : Rabbit;
+  const isRunner = role === "runner";
+  const Icon = isHunter ? Crosshair : isRunner ? Rabbit : CircleDashed;
+  const label = isHunter ? "Hunter" : isRunner ? "Runner" : "Standby";
 
   return (
     <span
@@ -23,12 +25,14 @@ export function RoleBadge({
         compact ? "h-7 text-[9px]" : "h-8 text-[10px]",
         isHunter
           ? "border-hunter/35 bg-hunter/10 text-hunter"
-          : "border-runner/35 bg-runner/10 text-runner",
+          : isRunner
+            ? "border-runner/35 bg-runner/10 text-runner"
+            : "border-line-strong bg-surface-2 text-muted",
         className,
       )}
     >
       <Icon className={compact ? "size-3" : "size-3.5"} />
-      {isHunter ? "Hunter" : "Runner"}
+      {label}
       {suffix ? (
         <>
           <span className="opacity-30">/</span>

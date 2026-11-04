@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   BrowserRouter,
   Navigate,
@@ -7,10 +7,10 @@ import {
   Routes,
   useLocation,
 } from "react-router-dom";
-import { ToastProvider } from "@/components/ui/Toast";
+import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { DevPanel } from "@/components/game/DevPanel";
 import { usePreferences } from "@/store/preferences";
-import { useGame } from "@/store/game";
+import { useGame, useYou } from "@/store/game";
 import { HomePage } from "@/pages/HomePage";
 import { CreateLobbyPage } from "@/pages/CreateLobbyPage";
 import { JoinPage } from "@/pages/JoinPage";
@@ -21,6 +21,7 @@ import { SpectatorPage } from "@/pages/SpectatorPage";
 import { ResultsPage } from "@/pages/ResultsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import type { Role } from "@/lib/types";
 
 function ThemeSync() {
   const theme = usePreferences((state) => state.theme);
@@ -39,16 +40,53 @@ function ThemeSync() {
   return null;
 }
 
-function GameClock() {
+/** Restores the persisted lobby session and surfaces server action errors. */
+function RealtimeSync() {
+  const bootstrap = useGame((state) => state.bootstrap);
+  const actionError = useGame((state) => state.actionError);
+  const clearActionError = useGame((state) => state.clearActionError);
+  const { toast } = useToast();
+
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      const state = useGame.getState();
-      if (state.phase === "active") state.tick();
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+    bootstrap();
+  }, [bootstrap]);
+
+  useEffect(() => {
+    if (!actionError) return;
+    toast(actionError.message, { tone: "warning" });
+    clearActionError();
+  }, [actionError, clearActionError, toast]);
 
   return null;
+}
+
+function homeForRole(role: Role, code: string): string {
+  if (role === "hunter") return "/game/hunter";
+  if (role === "runner") return "/game/runner";
+  return code ? `/lobby/${code}` : "/join";
+}
+
+/**
+ * Keeps players on the screen that matches the role the host gave them.
+ * Without a session the routes stay open so the dev console can preview them.
+ */
+function RoleGate({ role, children }: { role: Role; children: ReactNode }) {
+  const you = useYou();
+  const session = useGame((state) => state.session);
+  const phase = useGame((state) => state.phase);
+  const code = useGame((state) => state.code);
+  const bootstrapped = useGame((state) => state.bootstrapped);
+
+  if (!bootstrapped) return null;
+  if (!session || !you) return <>{children}</>;
+  if (phase === "ended") return <Navigate to="/results" replace />;
+  if (phase === "lobby") {
+    return <Navigate to={code ? `/lobby/${code}` : "/join"} replace />;
+  }
+  if (you.role !== role) {
+    return <Navigate to={homeForRole(you.role, code)} replace />;
+  }
+  return <>{children}</>;
 }
 
 function ScrollToTop() {
@@ -73,7 +111,7 @@ export function App() {
   return (
     <ToastProvider>
       <ThemeSync />
-      <GameClock />
+      <RealtimeSync />
       <BrowserRouter>
         <ScrollToTop />
         <Routes>
@@ -83,8 +121,22 @@ export function App() {
             <Route path="join" element={<JoinPage />} />
             <Route path="join/:code" element={<JoinPage />} />
             <Route path="lobby/:code" element={<LobbyPage />} />
-            <Route path="game/hunter" element={<HunterPage />} />
-            <Route path="game/runner" element={<RunnerPage />} />
+            <Route
+              path="game/hunter"
+              element={
+                <RoleGate role="hunter">
+                  <HunterPage />
+                </RoleGate>
+              }
+            />
+            <Route
+              path="game/runner"
+              element={
+                <RoleGate role="runner">
+                  <RunnerPage />
+                </RoleGate>
+              }
+            />
             <Route path="game/spectator" element={<SpectatorPage />} />
             <Route path="results" element={<ResultsPage />} />
             <Route path="settings" element={<SettingsPage />} />

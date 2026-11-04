@@ -159,7 +159,7 @@ export function HunterPage() {
               <RoleBadge role="hunter" compact />
               <div className="hidden sm:block">
                 <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink">
-                  ECHO / FIELD
+                  {you?.name ?? "YOU"} / FIELD
                 </p>
                 <p className="mt-0.5 font-mono text-[7px] uppercase tracking-[0.16em] text-faint">
                   Hunter channel
@@ -393,9 +393,25 @@ export function HunterPage() {
             <div className="hidden pt-2 lg:block">
               <p className="label-mono mb-2">Field log</p>
               <div className="space-y-2">
-                <LogRow time="00:42" text="WREN signal acquired" tone="runner" />
-                <LogRow time="02:18" text="KILO moved 180 m north" tone="hunter" />
-                <LogRow time="04:10" text="Ping cycle complete" tone="neutral" />
+                <LogRow
+                  time={formatClock(Math.max(0, pingCount * settings.pingSec))}
+                  text={
+                    activeRunners[0]
+                      ? `${activeRunners[0].name} signal acquired`
+                      : "No active runner signals"
+                  }
+                  tone="runner"
+                />
+                <LogRow
+                  time={formatClock(Math.max(0, pingCount * settings.pingSec))}
+                  text={`${hunters.length} hunters in the field`}
+                  tone="hunter"
+                />
+                <LogRow
+                  time={formatClock(Math.max(0, pingCount * settings.pingSec))}
+                  text={pingCount > 0 ? "Ping cycle complete" : "Awaiting first ping"}
+                  tone="neutral"
+                />
               </div>
             </div>
           </div>
@@ -477,7 +493,7 @@ export function HunterPage() {
           <MenuRow
             icon={RefreshCcw}
             title="Replay ping"
-            description="Trigger a mock location ping"
+            description="Broadcast runner positions now"
             onClick={() => {
               useGame.getState().triggerPing();
               setMenuOpen(false);

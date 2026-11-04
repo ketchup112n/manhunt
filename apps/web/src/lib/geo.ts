@@ -82,29 +82,64 @@ export function formatAgo(seconds: number): string {
 
 export const DEMO_CENTER = { lat: 40.7829, lng: -73.9654 };
 
-// Unified mock positions for all players (used regardless of assigned role)
-export const MOCK_PLAYER_POSITIONS = [
-  { id: "you", name: "ECHO", lat: 40.7829, lng: -73.9654 },
-  { id: "vex", name: "VEX", lat: 40.7841, lng: -73.9637 },
-  { id: "kilo", name: "KILO", lat: 40.7809, lng: -73.9681 },
-  { id: "wren", name: "WREN", lat: 40.7852, lng: -73.9601, accuracyM: 8 },
-  { id: "ash", name: "ASH", lat: 40.7798, lng: -73.9622, accuracyM: 12 },
-  { id: "rook", name: "ROOK", lat: 40.7871, lng: -73.9698, accuracyM: 6 },
-  { id: "nova", name: "NOVA", lat: 40.7783, lng: -73.9702, accuracyM: 18 },
-];
-
-export function getPlayerPosition(id: string) {
-  return MOCK_PLAYER_POSITIONS.find((p) => p.id === id);
+export interface SimulatedPosition extends LatLng {
+  id: string;
+  name: string;
+  accuracyM: number;
 }
 
-export function getHunterPositions(players: { id: string }[]) {
-  const hunterIds = new Set(players.map((p) => p.id));
-  return MOCK_PLAYER_POSITIONS.filter((pos) => hunterIds.has(pos.id));
+/**
+ * Deterministic placeholder positions. Real geolocation is not wired up yet,
+ * so every joined player gets a stable offset around the staging point. The
+ * same id always maps to the same spot, which keeps markers from jumping on
+ * every snapshot.
+ */
+function hashId(id: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < id.length; index += 1) {
+    hash ^= id.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
-export function getRunnerPositions(players: { id: string }[]) {
-  const runnerIds = new Set(players.map((p) => p.id));
-  return MOCK_PLAYER_POSITIONS.filter((pos) => runnerIds.has(pos.id));
+export function getPlayerPosition(
+  id: string,
+  name = "PLAYER",
+): SimulatedPosition {
+  const hash = hashId(id);
+  const angle = ((hash % 360) * Math.PI) / 180;
+  const distanceM = 45 + ((hash >>> 9) % 340);
+  const northM = Math.cos(angle) * distanceM;
+  const eastM = Math.sin(angle) * distanceM;
+  const lat = DEMO_CENTER.lat + northM / 111_320;
+  const lng =
+    DEMO_CENTER.lng +
+    eastM / (111_320 * Math.cos((DEMO_CENTER.lat * Math.PI) / 180));
+
+  return {
+    id,
+    name,
+    lat,
+    lng,
+    accuracyM: 6 + ((hash >>> 17) % 16),
+  };
+}
+
+export function getHunterPositions(
+  players: { id: string; name?: string }[],
+): SimulatedPosition[] {
+  return players.map((player) =>
+    getPlayerPosition(player.id, player.name ?? player.id.slice(0, 4).toUpperCase()),
+  );
+}
+
+export function getRunnerPositions(
+  players: { id: string; name?: string }[],
+): SimulatedPosition[] {
+  return players.map((player) =>
+    getPlayerPosition(player.id, player.name ?? player.id.slice(0, 4).toUpperCase()),
+  );
 }
 
 export function nearestHunter(

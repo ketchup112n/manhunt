@@ -1,4 +1,4 @@
-export type Role = "hunter" | "runner";
+export type Role = "hunter" | "runner" | "unassigned";
 export type Theme = "dark" | "light";
 export type Units = "metric" | "imperial";
 export type GamePhase = "lobby" | "prep" | "active" | "ended";
@@ -33,10 +33,13 @@ export interface Player {
   role: Role;
   isYou: boolean;
   isHost: boolean;
+  isBot: boolean;
   ready: boolean;
   status: "active" | "caught";
   avatar: string;
-  tagCode: string;
+  /** Only present for the player who owns the PIN (and dev snapshots). */
+  tagCode?: string;
+  connected: boolean;
 }
 
 export interface LatLng {
@@ -59,6 +62,52 @@ export interface Preferences {
   reduceMotion: boolean;
   northUp: boolean;
 }
+
+export interface LobbySession {
+  code: string;
+  playerId: string;
+  token: string;
+}
+
+export interface Snapshot {
+  code: string;
+  phase: GamePhase;
+  hostId: string;
+  settings: GameSettings;
+  players: Omit<Player, "isYou">[];
+  youId: string;
+  timeLeftSec: number;
+  prepRemainingSec: number;
+  nextPingSec: number;
+  lastPingAgo: number;
+  pingCount: number;
+  pingExpiresInMs: number;
+  resultWinner: Winner | null;
+}
+
+export type TagResult =
+  | { result: "success"; targetId: string; targetName: string }
+  | { result: "invalid" }
+  | { result: "no-target" };
+
+export type ClientMessage =
+  | { type: "updateSettings"; settings: Partial<GameSettings> }
+  | { type: "assignRole"; playerId: string; role: Role }
+  | { type: "randomizeTeams" }
+  | { type: "setReady"; ready: boolean }
+  | { type: "start" }
+  | { type: "skipPrep" }
+  | { type: "ping" }
+  | { type: "submitTag"; code: string }
+  | { type: "endGame"; winner: Winner }
+  | { type: "fillBots"; count?: number }
+  | { type: "removeBots" }
+  | { type: "leave" };
+
+export type ServerMessage =
+  | { type: "state"; state: Snapshot }
+  | { type: "tagResult"; tag: TagResult }
+  | { type: "error"; message: string };
 
 export const DEFAULT_SETTINGS: GameSettings = {
   prepSec: 120,

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, LockKeyhole, ShieldCheck } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
@@ -9,12 +10,29 @@ import {
   SettingsEditor,
   SettingsSummary,
 } from "@/components/game/SettingsEditor";
-import { useGame, useYou } from "@/store/game";
+import { useGame } from "@/store/game";
 
 export function CreateLobbyPage() {
   const navigate = useNavigate();
-  const you = useYou();
-  const setYouName = useGame((s) => s.setYouName);
+  const draftName = useGame((s) => s.draftName);
+  const setDraftName = useGame((s) => s.setDraftName);
+  const settings = useGame((s) => s.settings);
+  const createLobby = useGame((s) => s.createLobby);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const create = async () => {
+    if (busy) return;
+    setError("");
+    setBusy(true);
+    const result = await createLobby(draftName, settings);
+    setBusy(false);
+    if (result.ok && result.code) {
+      navigate(`/lobby/${result.code}`);
+    } else {
+      setError(result.error ?? "Could not create the lobby.");
+    }
+  };
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -45,8 +63,8 @@ export function CreateLobbyPage() {
               </span>
               <input
                 id="display-name"
-                value={you?.name ?? ""}
-                onChange={(event) => setYouName(event.target.value)}
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
                 placeholder="YOUR NAME"
                 maxLength={12}
                 className="h-9 w-full max-w-[220px] rounded-[3px] border border-line bg-canvas/40 px-3 font-mono text-xs uppercase tracking-[0.08em] text-ink outline-none transition-colors placeholder:text-faint/60 focus:border-runner/60"
@@ -74,7 +92,7 @@ export function CreateLobbyPage() {
                   MANHUNT
                 </h2>
                 <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.16em] text-faint">
-                  Hosted by {you?.name || "YOU"}
+                  Hosted by {draftName || "YOU"}
                 </p>
               </div>
 
@@ -97,14 +115,21 @@ export function CreateLobbyPage() {
                   </div>
                 </div>
 
+                {error ? (
+                  <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.12em] text-danger">
+                    {error}
+                  </p>
+                ) : null}
+
                 <Button
                   variant="hunter"
                   size="lg"
                   full
                   className="mt-4"
-                  onClick={() => navigate("/lobby/VX7K2M")}
+                  onClick={() => void create()}
+                  disabled={busy}
                 >
-                  Create lobby
+                  {busy ? "Creating..." : "Create lobby"}
                   <ArrowRight className="size-4" />
                 </Button>
                 <p className="mt-2 text-center font-mono text-[7px] uppercase tracking-[0.16em] text-faint">
@@ -131,9 +156,10 @@ export function CreateLobbyPage() {
             size="lg"
             full
             className="mx-4 max-w-6xl"
-            onClick={() => navigate("/lobby/VX7K2M")}
+            onClick={() => void create()}
+            disabled={busy}
           >
-            Create lobby
+            {busy ? "Creating..." : "Create lobby"}
             <ArrowRight className="size-4" />
           </Button>
         </div>

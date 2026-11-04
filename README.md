@@ -1,8 +1,8 @@
 # MANHUNT
 
-A mobile-first, frontend-only prototype for a real-world manhunt game. Hosts configure the round, assign players to teams manually or at random, and choose whether runners can view all hunters on a map. Hunters receive periodic runner location pings and register catches with a runner-only PIN. Runners get a compass, a private tag code, and an optional shrinking play area.
+A mobile-first, realtime lobby for a real-world manhunt game. Hosts create a lobby, share a six-character code, assign players to teams, and deploy the round. Hunters receive periodic runner location pings and register catches with a runner-only PIN. Runners get a compass, a private tag code, and an optional shrinking play area.
 
-This is still a UI prototype: players, locations, pings, tags, timers, zones, and rooms are mock data. There is no backend, authentication, real geolocation, or realtime transport yet.
+Lobby state, timers, pings, and PIN validation live on a small WebSocket server, so players on different devices can join the same game. Locations and compass headings are still simulated; real geolocation and device sensors are not wired up yet.
 
 ## Quick start
 
@@ -13,25 +13,52 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173>. The dev server exposes the demo console in development builds only.
+`npm run dev` starts both processes:
+
+- Web app: <http://localhost:5173>
+- Realtime server: <http://localhost:8787>
+
+The Vite dev server proxies `/api` and `/ws` to the backend. Open the site on a phone or another browser, create a lobby, and share the code.
 
 ### Scripts
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start the Vite dev server |
-| `npm run build` | Type-check and build for production |
+| `npm run dev` | Start the API/WebSocket server and the Vite dev server together |
+| `npm run dev:web` | Start only the Vite dev server |
+| `npm run dev:server` | Start only the realtime server |
+| `npm run build` | Type-check + build the web app, then type-check the server |
+| `npm run start` | Serve the built web app and realtime API on port 8787 |
 | `npm run lint` | Run ESLint |
-| `npm run typecheck` | Run TypeScript without emitting |
-| `npm run test` | Run the zone schedule unit tests |
-| `npm run preview` | Preview the production build |
+| `npm run typecheck` | Type-check both workspaces |
+| `npm run test` | Run zone-schedule and lobby unit tests |
+| `npm run preview` | Preview the production web build |
+
+### Environment
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `8787` | Server port |
+| `HOST` | `0.0.0.0` | Bind address |
+| `MANHUNT_DEV_PINS` | `false` | Include every runner PIN in snapshots for the dev console. `npm run dev` sets it to `true` |
+| `NODE_ENV` | unset | `production` disables debug PINs even if the flag is set |
+
+For a production build:
+
+```bash
+npm run build
+NODE_ENV=production npm start
+```
+
+The server serves `apps/web/dist` and falls back to `index.html` for client routes.
 
 ## Stack
 
 - React 19 + React Router 7
 - Vite 7 + TypeScript 5.9
 - Tailwind CSS v4 design tokens with dark / daylight themes
-- Zustand for mock game state and persisted preferences
+- Zustand for client state and persisted preferences
+- Node.js HTTP + `ws` for lobby state, timers, pings, and PIN validation
 - Leaflet + react-leaflet with dark-filtered OpenStreetMap tiles
 - Motion for transitions, lucide-react icons, qrcode.react for lobby invites
 
@@ -40,10 +67,10 @@ Open <http://localhost:5173>. The dev server exposes the demo console in develop
 | Route | Screen |
 | --- | --- |
 | `/` | Landing / entry |
-| `/create` | Create lobby and configure rules |
+| `/create` | Create a real lobby and configure rules |
 | `/join` | Join with a lobby code |
 | `/join/:code` | Join with a prefilled code |
-| `/lobby/:code` | Host lobby, team assignment, invite QR, editable settings, prep |
+| `/lobby/:code` | Host lobby, standby list, team assignment, invite QR, editable settings, prep |
 | `/game/hunter` | Hunter map HUD, ping intel, PIN tag flow |
 | `/game/runner` | Runner compass HUD, exposure status, private PIN, optional hunter map |
 | `/game/spectator` | Spectator field view |
@@ -51,17 +78,27 @@ Open <http://localhost:5173>. The dev server exposes the demo console in develop
 | `/settings` | Display, units, sound, haptics, motion |
 | `*` | Not found |
 
-The default mock lobby is **MANHUNT** with code **VX7K2M**, host display name **ECHO**, hunters **ECHO / VEX / KILO**, and runners **WREN / ASH / ROOK / NOVA**. Every runner has a unique 4-digit PIN.
+## Multiplayer flow
 
-## Demo flow
+1. The host opens **Create lobby**, picks a display name, reviews the rules, and presses **Create lobby**.
+2. The server creates a six-character code and returns a private session token. The token is stored in `localStorage` so a reload reconnects the same player.
+3. Players open **Join**, enter the code and a name. They appear under **Standby** until the host assigns them.
+4. The host moves players between **Hunters** and **Runners** with the team buttons or drag-and-drop, or uses **Randomize teams**. Every player must be assigned before the round can start.
+5. The host starts the operation. The server runs the prep countdown, then activates the round. Phones follow the server clock and route each player to the correct screen.
+6. During the round, the server fires pings on schedule. Hunters see last-known runner positions for ten seconds after each ping.
+7. A hunter asks a caught runner for their four-digit PIN and enters it. The server validates the PIN, marks the runner caught, and moves them to spectator mode.
+8. The round ends when time expires, every runner is caught, or the host ends it early.
 
-1. Open `/lobby/VX7K2M` to skip setup and land in a populated lobby.
-2. In the lobby, assign players to teams with **Move**, or use **Randomize teams**. Players cannot select their own side.
-3. Optionally edit the protocol, including the shrinking zone, from **Mission rules → Edit**.
-4. Start the operation, skip the prep overlay, and enter the field.
-5. As a hunter, wait for the first ping, inspect last-known runner positions, then enter a runner's private PIN to register a catch.
-6. As a runner, use the compass, keep your private PIN secret until physically caught, and view all hunters on the map if the host enabled it.
-7. End the round from the demo console or menu to see the after-action report.
+### Dev bots
+
+The dev console (right-edge **Demo** tab, development builds only) can fill the lobby with bots for solo testing. Bots are assigned a balanced mix of hunters and runners, marked ready, and can be cleared again. The same panel reveals runner PINs and lets you jump between screens.
+
+### Privacy
+
+- The server sends a player's PIN only to that player.
+- In development, `npm run dev` sets `MANHUNT_DEV_PINS=true`, so the demo console can show every PIN. The production `start` script leaves the flag off.
+- Session tokens are bearer credentials for the socket; they are not passwords and are only stored locally.
+- Teams and settings are host-controlled. The server rejects team changes, rule edits, and early endings from other players.
 
 ### Shrinking zone
 
@@ -73,43 +110,51 @@ When enabled, the play area behaves like a battle-royale circle. Each interval i
 
 The same schedule powers the settings summary, the lobby schedule warning, the map circles, the in-field zone chip/panel, and the unit tests in `apps/web/src/lib/zone.test.ts`. If the schedule would run past the end of the round, the host sees a warning before deploying.
 
-### Demo console
+## API
 
-The vertical **DEMO** tab on the right edge opens prototype controls in development builds only:
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /api/lobbies` | Create a lobby: `{ name, settings }` → `{ code, playerId, token }` |
+| `POST /api/lobbies/:code/join` | Join a lobby: `{ name }` → `{ code, playerId, token }` |
+| `GET /api/lobbies/:code` | Lobby summary and player count |
+| `GET /api/health` | Server health and lobby count |
+| `WS /ws?code=...&token=...` | Realtime state and actions |
 
-- Jump to any screen
-- Trigger pings, start the round, force a winner, reset all mock data
-- Reveal every runner PIN for testing
-- Simulate the runner's compass heading
-- Toggle night ops / daylight
-
-## Prototype behavior and limitations
-
-- **No backend.** Players, pings, tags, timers, zones, and results live in memory and reset on reload. Theme and other preferences persist in `localStorage` under `manhunt-prefs`.
-- **Mock location and sensors.** All positions and compass headings are static or simulated; no browser geolocation or device orientation APIs are used.
-- **No rooms or realtime.** The join code is a UI prop. Invite QR codes point at the mock join route.
-- **Map tiles require network access.** Leaflet renders OpenStreetMap tiles with a CSS filter for the dark theme.
-- **Tags are simulated.** A hunter enters the runner's private PIN. In a real game, PINs must be private per player and validated by the server.
-- **Teams are host-controlled.** Only the host can assign hunters and runners or randomize teams; player-facing screens never expose a side picker.
-- **Demo console is dev-only.** It is gated behind `import.meta.env.DEV` and is absent from production builds.
-- **Not production-ready.** Expect placeholder accessibility, no analytics, no error reporting, and mock fallbacks when `/results` is opened directly.
+Every socket receives a tailored snapshot: lobby settings, player list, roles, connection state, countdowns, ping status, and the caller's own PIN. Client actions are sent as JSON messages (`assignRole`, `start`, `submitTag`, `fillBots`, and so on) and validated server-side.
 
 ## Project structure
 
 ```text
-apps/web/
-  src/
-    components/   brand, game HUD, zone HUD, layout, UI primitives
-    lib/          types, geo math, mock positions, zone schedule, utilities
-    pages/        route screens
-    store/        Zustand game state and preferences
-    styles/       tokens, themes, HUD textures, Leaflet styling
+apps/
+  server/
+    src/
+      index.ts      HTTP, WebSocket transport, static serving
+      lobby.ts      lobby state machine, timers, PINs, bot fill
+      lobby.test.ts server unit tests
+      types.ts      shared wire protocol types
+  web/
+    src/
+      components/   brand, game HUD, zone HUD, layout, UI primitives
+      lib/          types, geo math, simulated positions, zone schedule, utilities
+      pages/        route screens
+      store/        Zustand realtime session and preferences
+      styles/       tokens, themes, HUD textures, Leaflet styling
 ```
+
+## Current limitations
+
+- **No accounts or persistence.** Lobbies live in server memory and disappear after six idle hours or a server restart. A restart requires players to join again.
+- **Simulated location and sensors.** Positions are deterministic offsets around a staging point and compass headings are simulated. No browser geolocation or orientation APIs are used.
+- **No pressure testing.** One process, in-memory state, and no rate limiting; suitable for a friend-group game, not a public deployment.
+- **Map tiles require network access.** Leaflet renders OpenStreetMap tiles with a CSS filter for the dark theme.
+- **Basic resilience only.** The client reconnects with backoff, but the host keeps their role while offline and there is no host migration during a round.
+- **Dev console is dev-only.** It is gated behind `import.meta.env.DEV` and absent from production builds.
 
 ## Next steps
 
-- Real backend with rooms, auth, and WebSocket presence
-- Geolocation ingestion with ping scheduling and server-side tag validation
+- Geolocation ingestion with real ping positions
 - Device orientation permissions and compass calibration
+- Redis-backed rooms or a database for persistence across restarts
+- Authentication, rate limiting, and host migration during a round
 - Production map tile provider and offline/error states
 - Accessibility and performance pass, including route-level code splitting

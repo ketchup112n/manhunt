@@ -66,7 +66,7 @@ export function RunnerMap({
   const shrinking = zone.enabled && zone.isShrinking;
   const activeBoundary = shrinking ? "#ffc24b" : boundary;
 
-  // Runner's position is always ECHO's position (DEMO_CENTER)
+  // The runner's own simulated position is the staging point.
   const runnerPos: LatLng = DEMO_CENTER;
 
   const hunterTargets = hunterPositions

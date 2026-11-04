@@ -28,11 +28,14 @@ import { Modal } from "@/components/ui/Modal";
 import { Sheet } from "@/components/ui/Sheet";
 import { useToast } from "@/components/ui/Toast";
 import {
+  DEMO_CENTER,
   formatAgo,
   formatClock,
   formatDistance,
   formatLongClock,
   formatRadius,
+  getHunterPositions,
+  nearestHunter,
 } from "@/lib/geo";
 import { useGame, useYou, useZoneState } from "@/store/game";
 import { usePreferences } from "@/store/preferences";
@@ -67,8 +70,11 @@ export function RunnerPage() {
     (player) => player.role === "runner" && player.status === "active",
   );
 
-  // Use a fixed mock for nearest hunter bearing/distance
-  const nearest = { bearing: 47, distanceM: 320 };
+  const hunterPositions = getHunterPositions(hunters);
+  const nearestInfo = nearestHunter(DEMO_CENTER, hunterPositions);
+  const nearest = nearestInfo
+    ? { bearing: nearestInfo.bearing, distanceM: nearestInfo.distanceM }
+    : { bearing: 0, distanceM: 0 };
 
   const distanceLabel = formatDistance(nearest.distanceM, units);
   const pingProgress = settings.pingSec === 0 ? 0 : nextPingSec / settings.pingSec;
@@ -416,15 +422,17 @@ export function RunnerPage() {
               }}
             />
           ) : null}
-          <MenuRow
-            icon={RefreshCcw}
-            title="Replay ping"
-            description="Trigger a mock location ping"
-            onClick={() => {
-              useGame.getState().triggerPing();
-              setMenuOpen(false);
-            }}
-          />
+          {you?.isHost ? (
+            <MenuRow
+              icon={RefreshCcw}
+              title="Replay ping"
+              description="Broadcast every runner position now"
+              onClick={() => {
+                useGame.getState().triggerPing();
+                setMenuOpen(false);
+              }}
+            />
+          ) : null}
           <MenuRow
             icon={LogOut}
             title="Abandon operation"

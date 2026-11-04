@@ -36,7 +36,7 @@ const steps = [
 export function HomePage() {
   return (
     <div className="flex min-h-dvh flex-col">
-      <TopBar right={<Chip tone="runner" dot className="hidden sm:inline-flex">Prototype</Chip>} />
+      <TopBar right={<Chip tone="runner" dot className="hidden sm:inline-flex">Realtime</Chip>} />
 
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 sm:px-6">
         <div className="flex items-center justify-between border-y border-line/60 py-2.5 font-mono text-[8px] uppercase tracking-[0.2em] text-faint">
@@ -156,7 +156,7 @@ export function HomePage() {
 
       <footer className="relative z-10 border-t border-line/70">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-4 font-mono text-[8px] uppercase tracking-[0.16em] text-faint sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>Manhunt / UI prototype 0.1</span>
+          <span>Manhunt / realtime lobby 0.2</span>
           <span className="text-faint/80">Play outdoors. Stay aware. Respect the city.</span>
         </div>
       </footer>
