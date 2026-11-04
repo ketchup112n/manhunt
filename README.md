@@ -73,6 +73,40 @@ Caveats:
 
 Cloudflare Pages can host the static build, but it cannot run the Node WebSocket server this app needs. Point Pages at a separately hosted server, or port the lobby to Workers + Durable Objects, before using it as a real deployment.
 
+## Deploy
+
+The whole app — static build, REST API, and WebSocket server — runs from one Node process, so it can be deployed to any Node host that supports WebSockets (Render, Railway, Fly.io, a VPS).
+
+### Render
+
+The repo includes `render.yaml`. Either:
+
+1. Open <https://dashboard.render.com/blueprints> and connect this repository, or
+2. Create a **New Web Service**, point it at the repo, and set:
+
+| Setting | Value |
+| --- | --- |
+| Branch | `feature/shrinking-zone` (or `main` after merging) |
+| Build command | `npm ci && npm run build` |
+| Start command | `npm start` |
+| Health check path | `/api/health` |
+
+`render.yaml` already sets these values and disables debug PINs. Change the branch if you deploy from `main`.
+
+Render's free plan works for testing. It sleeps after a period of inactivity, so the first request after a break takes a few seconds to wake. Lobbies are held in memory and are lost whenever the service restarts or redeploys.
+
+### Other hosts
+
+The server reads `PORT` and `HOST` from the environment and serves `apps/web/dist`, so any container or buildpack host works:
+
+```bash
+npm ci
+npm run build
+NODE_ENV=production MANHUNT_DEV_PINS=false npm start
+```
+
+Make sure the platform forwards WebSocket upgrades to the same port.
+
 ## Stack
 
 - React 19 + React Router 7

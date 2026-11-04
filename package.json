@@ -6,6 +6,9 @@
     "apps/web",
     "apps/server"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "concurrently -n server,web -c cyan,magenta \"npm run dev -w @manhunt/server\" \"npm run dev -w @manhunt/web\"",
     "dev:web": "npm run dev -w @manhunt/web",
