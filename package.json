@@ -9,6 +9,7 @@
     "dev": "npm run dev -w @manhunt/web",
     "build": "npm run build -w @manhunt/web",
     "lint": "npm run lint -w @manhunt/web",
-    "typecheck": "npm run typecheck -w @manhunt/web"
+    "typecheck": "npm run typecheck -w @manhunt/web",
+    "test": "npm run test -w @manhunt/web"
   }
 }

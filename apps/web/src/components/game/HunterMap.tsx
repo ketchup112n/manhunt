@@ -3,6 +3,7 @@ import { LocateFixed, Minus, Plus } from "lucide-react";
 import { DEMO_CENTER, getHunterPositions } from "@/lib/geo";
 import { createPlayerMarkerIcon } from "@/components/game/playerMarker";
 import { usePreferences } from "@/store/preferences";
+import { useZoneState } from "@/store/game";
 import type { LatLng } from "@/lib/types";
 
 function MapControls({ home }: { home: LatLng }) {
@@ -49,8 +50,12 @@ export function HunterMap({
   pingKey: number;
 }) {
   const theme = usePreferences((state) => state.theme);
+  const zone = useZoneState();
   const boundary = theme === "dark" ? "#4fe3c1" : "#007a62";
   const hunterPositions = getHunterPositions(hunters);
+  const radius = zone.enabled ? zone.currentRadiusM : playAreaM;
+  const shrinking = zone.enabled && zone.isShrinking;
+  const activeBoundary = shrinking ? "#ffc24b" : boundary;
 
   return (
     <div className="absolute inset-0">
@@ -66,16 +71,29 @@ export function HunterMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
+        {zone.enabled ? (
+          <Circle
+            center={[DEMO_CENTER.lat, DEMO_CENTER.lng]}
+            radius={zone.startRadiusM}
+            pathOptions={{
+              color: boundary,
+              weight: 1,
+              opacity: 0.25,
+              dashArray: "4 9",
+              interactive: false,
+            }}
+          />
+        ) : null}
         <Circle
           center={[DEMO_CENTER.lat, DEMO_CENTER.lng]}
-          radius={playAreaM}
+          radius={radius}
           pathOptions={{
-            color: boundary,
-            weight: 1,
-            opacity: 0.45,
-            dashArray: "4 9",
-            fillColor: boundary,
-            fillOpacity: 0.02,
+            color: activeBoundary,
+            weight: zone.enabled ? 1.5 : 1,
+            opacity: zone.enabled ? 0.7 : 0.45,
+            dashArray: zone.enabled ? undefined : "4 9",
+            fillColor: activeBoundary,
+            fillOpacity: zone.enabled ? 0.03 : 0.02,
             interactive: false,
           }}
         />

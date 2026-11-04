@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { HunterMap } from "@/components/game/HunterMap";
 import { EndMatchModal } from "@/components/game/EndMatchModal";
+import { ZonePanel, ZoneRuleNote, ZoneStatusChip } from "@/components/game/ZoneHud";
 import { RoleBadge } from "@/components/hud/RoleBadge";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -37,7 +38,7 @@ import {
   formatLongClock,
   formatRadius,
 } from "@/lib/geo";
-import { useGame, useYou } from "@/store/game";
+import { useGame, useYou, useZoneState } from "@/store/game";
 import { usePreferences } from "@/store/preferences";
 import type { RunnerSignal } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -55,6 +56,7 @@ export function HunterPage() {
   const pingExpiresAt = useGame((state) => state.pingExpiresAt);
   const endGame = useGame((state) => state.endGame);
   const phase = useGame((state) => state.phase);
+  const zone = useZoneState();
   const you = useYou();
   const [menuOpen, setMenuOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -166,6 +168,8 @@ export function HunterPage() {
             </div>
 
             <div className="flex items-center gap-1.5">
+              <ZoneStatusChip tone="hunter" />
+
               <div className="flex items-center gap-2 rounded-[3px] border border-line-strong/60 bg-surface/90 px-2.5 py-1.5 shadow-lg backdrop-blur-md">
                 <ProgressRing
                   progress={pingProgress}
@@ -284,6 +288,8 @@ export function HunterPage() {
           </div>
 
           <div className="space-y-2 p-3">
+            <ZonePanel tone="hunter" />
+
             {signals.map((signal) => {
               const distance = distanceMeters(DEMO_CENTER, signal);
               return (
@@ -498,6 +504,15 @@ export function HunterPage() {
           <RuleRow label="Round duration" value={formatLongClock(settings.durationSec)} />
           <RuleRow label="Play area" value={`${formatRadius(settings.playAreaM, units)} radius`} />
           <RuleRow
+            label="Shrinking zone"
+            value={
+              zone.enabled
+                ? `On · −${zone.shrinkStepM} m / ${Math.round(zone.intervalSec / 60)} min`
+                : "Off"
+            }
+            accent={zone.enabled ? "runner" : undefined}
+          />
+          <RuleRow
             label="Hunter tracking"
             value={settings.showHunterTeammates ? "Visible" : "Hidden"}
           />
@@ -514,6 +529,7 @@ export function HunterPage() {
           Runners never receive hunter names. When intel is enabled, runners
           see anonymous hunter markers with bearing and distance only.
         </p>
+        <ZoneRuleNote tone="hunter" />
       </Modal>
 
       <TagSheet open={tagOpen} onClose={() => setTagOpen(false)} tagCode={tagCode} onTagCodeChange={setTagCode} onSubmit={submitTag} />

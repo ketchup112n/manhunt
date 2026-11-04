@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useMemo } from "react";
 import {
   DEFAULT_SETTINGS,
   type GamePhase,
@@ -8,6 +9,7 @@ import {
   type TagState,
   type Winner,
 } from "@/lib/types";
+import { computeZoneState, type ZoneState } from "@/lib/zone";
 
 const INITIAL_PLAYERS: Player[] = [
   {
@@ -91,7 +93,6 @@ const INITIAL_PLAYERS: Player[] = [
 
 interface GameStore {
   code: string;
-  gameName: string;
   phase: GamePhase;
   settings: GameSettings;
   players: Player[];
@@ -102,17 +103,10 @@ interface GameStore {
   pingExpiresAt: number;
   tagState: TagState;
   tagTargetId: string | null;
-  incomingTag: boolean;
-  incomingTagDeadline: number;
   resultWinner: Winner | null;
   deviceHeading: number;
 
   setYouName: (name: string) => void;
-  setGameName: (name: string) => void;
-  /** Legacy preview action, retained until all old navigation affordances are removed. */
-  setRole: (role: Role) => void;
-  triggerIncomingTag: () => void;
-  respondIncomingTag: (accepted: boolean) => void;
   updateSettings: (settings: Partial<GameSettings>) => void;
   assignPlayerRole: (id: string, role: Role) => void;
   randomizeTeams: () => void;
@@ -129,7 +123,6 @@ interface GameStore {
 
 const initialState = {
   code: "VX7K2M",
-  gameName: "MANHUNT",
   phase: "lobby" as GamePhase,
   settings: DEFAULT_SETTINGS,
   players: INITIAL_PLAYERS,
@@ -140,8 +133,6 @@ const initialState = {
   pingExpiresAt: 0,
   tagState: "idle" as TagState,
   tagTargetId: null as string | null,
-  incomingTag: false,
-  incomingTagDeadline: 0,
   resultWinner: null as Winner | null,
   deviceHeading: 24,
 };
@@ -166,19 +157,6 @@ export const useGame = create<GameStore>((set, get) => ({
           : p,
       ),
     })),
-
-  setGameName: (gameName) => set({ gameName: gameName.toUpperCase().slice(0, 24) }),
-
-  setRole: (role) => set((state) => ({
-    players: state.players.map((player) => player.isYou ? { ...player, role } : player),
-  })),
-
-  triggerIncomingTag: () => set({ incomingTag: true, incomingTagDeadline: Date.now() + 15_000 }),
-
-  respondIncomingTag: (accepted) => set((state) => ({
-    incomingTag: false,
-    players: accepted ? catchTarget(state.players, state.players.find((player) => player.isYou)?.id ?? null) : state.players,
-  })),
 
   updateSettings: (settings) =>
     set((state) => ({ settings: { ...state.settings, ...settings } })),
@@ -329,3 +307,22 @@ export const useHunters = () =>
   useGame((s) => s.players.filter((p) => p.role === "hunter"));
 export const useRunners = () =>
   useGame((s) => s.players.filter((p) => p.role === "runner"));
+
+/**
+ * Live shrinking-zone state for the active round. Each interval splits into a
+ * hold phase and a contraction phase, so the radius is derived from the round
+ * clock rather than stepped in discrete jumps.
+ */
+export const useZoneState = (): ZoneState => {
+  const settings = useGame((s) => s.settings);
+  const timeLeftSec = useGame((s) => s.timeLeftSec);
+  const phase = useGame((s) => s.phase);
+
+  return useMemo(() => {
+    const elapsedSec =
+      phase === "active" || phase === "ended"
+        ? Math.max(0, settings.durationSec - timeLeftSec)
+        : 0;
+    return computeZoneState(settings, elapsedSec);
+  }, [phase, settings, timeLeftSec]);
+};

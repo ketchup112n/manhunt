@@ -17,7 +17,14 @@ export interface GameSettings {
   locationIntervalSec: number;
   compassIntervalSec: number;
   maxPlayers: number;
-  tagRadiusM: number;
+  /** Battle-royale style shrinking play area. */
+  zoneEnabled: boolean;
+  /** Seconds between each zone contraction. */
+  zoneShrinkIntervalSec: number;
+  /** Meters removed from the radius on every contraction. */
+  zoneShrinkStepM: number;
+  /** Radius the zone settles at and never shrinks below. */
+  zoneFinalRadiusM: number;
 }
 
 export interface Player {
@@ -65,5 +72,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
   locationIntervalSec: 5,
   compassIntervalSec: 3,
   maxPlayers: 20,
-  tagRadiusM: 20,
+  zoneEnabled: false,
+  zoneShrinkIntervalSec: 300,
+  zoneShrinkStepM: 150,
+  zoneFinalRadiusM: 100,
 };

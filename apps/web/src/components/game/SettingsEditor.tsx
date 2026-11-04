@@ -4,8 +4,10 @@ import {
   Clock3,
   Crosshair,
   Map,
+  Shrink,
   SlidersHorizontal,
   TimerReset,
+  TriangleAlert,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -19,34 +21,59 @@ import {
 } from "@/components/ui/FormControls";
 import { useGame } from "@/store/game";
 import { formatDurationLabel, formatRadius } from "@/lib/geo";
+import {
+  normalizeZoneSettings,
+  zoneScheduleFit,
+  zoneScheduleLabel,
+  ZONE_MAX_INTERVAL_SEC,
+  ZONE_MAX_STEP_M,
+  ZONE_MIN_FINAL_M,
+  ZONE_MIN_INTERVAL_SEC,
+  ZONE_MIN_STEP_M,
+} from "@/lib/zone";
 import { usePreferences } from "@/store/preferences";
 import { cn } from "@/lib/cn";
 import type { GameSettings } from "@/lib/types";
 
+type SectionId = "timing" | "field" | "zone" | "advanced";
+
 export function SettingsEditor({ compact }: { compact?: boolean }) {
   const settings = useGame((s) => s.settings);
   const updateSettings = useGame((s) => s.updateSettings);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [open, setOpen] = useState<Record<SectionId, boolean>>({
+    timing: true,
+    field: true,
+    zone: true,
+    advanced: false,
+  });
   const units = usePreferences((s) => s.units);
   const pingMinutes = Math.round(settings.pingSec / 60);
   const durationMinutes = Math.round(settings.durationSec / 60);
   const prepMinutes = Math.round(settings.prepSec / 60);
   const estimatedPings = Math.max(1, Math.floor(settings.durationSec / settings.pingSec));
+  const zoneFit = zoneScheduleFit(settings);
 
-  const set = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) =>
-    updateSettings({ [key]: value } as Partial<GameSettings>);
+  const set = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
+    const next = { ...settings, [key]: value } as GameSettings;
+    updateSettings(normalizeZoneSettings(next));
+  };
+
+  const toggle = (id: SectionId) =>
+    setOpen((current) => ({ ...current, [id]: !current[id] }));
 
   return (
-    <div className={cn("space-y-3", compact && "space-y-2")}>
-      <Section
+    <div className={cn("space-y-2", compact && "space-y-1.5")}>
+      <CollapsibleSection
         icon={TimerReset}
         index="01"
         title="Timing"
-        description="How often hunters see you, and how long the round runs."
+        summary={`${pingMinutes}m ping · ${formatDurationLabel(durationMinutes)} · ${prepMinutes}m prep`}
+        expanded={open.timing}
+        onToggle={() => toggle("timing")}
         compact={compact}
       >
-        <div className={cn("space-y-6", compact && "space-y-4")}>
-          <Slider
+        <div className={cn("space-y-4", compact && "space-y-3")}>
+          <CompactSlider
             label="Ping interval"
             hint="Hunters receive a location snapshot of every active runner."
             value={settings.pingSec}
@@ -71,9 +98,9 @@ export function SettingsEditor({ compact }: { compact?: boolean }) {
             className={compact ? "gap-1" : undefined}
           />
 
-          <div className={cn("hairline", compact && "my-2")} />
+          <div className={cn("hairline", compact && "my-1.5")} />
 
-          <Slider
+          <CompactSlider
             label="Round duration"
             value={settings.durationSec}
             min={900}
@@ -96,9 +123,9 @@ export function SettingsEditor({ compact }: { compact?: boolean }) {
             className={compact ? "gap-1" : undefined}
           />
 
-          <div className={cn("hairline", compact && "my-2")} />
+          <div className={cn("hairline", compact && "my-1.5")} />
 
-          <Slider
+          <CompactSlider
             label="Runner head start"
             hint="Prep countdown before hunters are allowed to move."
             value={settings.prepSec}
@@ -112,17 +139,21 @@ export function SettingsEditor({ compact }: { compact?: boolean }) {
             compact={compact}
           />
         </div>
-      </Section>
+      </CollapsibleSection>
 
-      <Section
+      <CollapsibleSection
         icon={Crosshair}
         index="02"
         title="Rules of engagement"
-        description="Field size and which team intelligence is shared."
+        summary={`${formatRadius(settings.playAreaM, units)} field · ${
+          settings.showAllHuntersToRunners ? "all hunters" : "compass only"
+        }`}
+        expanded={open.field}
+        onToggle={() => toggle("field")}
         compact={compact}
       >
-        <div className={cn("space-y-6", compact && "space-y-4")}>
-          <Slider
+        <div className={cn("space-y-4", compact && "space-y-3")}>
+          <CompactSlider
             label="Play area radius"
             hint="Soft boundary around the starting point. Leaving it triggers a warning."
             value={settings.playAreaM}
@@ -167,128 +198,289 @@ export function SettingsEditor({ compact }: { compact?: boolean }) {
             />
           </div>
         </div>
-      </Section>
+      </CollapsibleSection>
 
-      <Card className="overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((open) => !open)}
-          aria-expanded={advancedOpen}
-          className={cn(
-            "flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-surface-2/40",
-            compact && "py-3 px-4",
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex size-8 items-center justify-center rounded-[2px] border border-line bg-surface-2 text-faint">
-              <SlidersHorizontal className="size-3.5" />
-            </span>
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink">
-                Advanced protocol
-              </p>
-              <p className="mt-0.5 text-[11px] text-muted">
-                Update rate, player cap, and sensor cadence.
-              </p>
-            </div>
-          </div>
-          <ChevronDown
-            className={cn(
-              "size-4 shrink-0 text-faint transition-transform duration-200",
-              advancedOpen && "rotate-180",
-            )}
+      <CollapsibleSection
+        icon={Shrink}
+        index="03"
+        title="Shrinking zone"
+        summary={
+          settings.zoneEnabled
+            ? zoneScheduleLabel(settings)
+            : "Static play area"
+        }
+        expanded={open.zone}
+        onToggle={() => toggle("zone")}
+        compact={compact}
+        accent={settings.zoneEnabled ? "runner" : undefined}
+      >
+        <div className={cn("space-y-4", compact && "space-y-3")}>
+          <Toggle
+            label="Battle royale play area"
+            description="The boundary contracts on a timer, forcing runners into tighter pockets."
+            checked={settings.zoneEnabled}
+            onChange={(value) => set("zoneEnabled", value)}
+            compact={compact}
           />
-        </button>
 
-        {advancedOpen ? (
-          <div className="border-t border-line px-5 pb-4">
-            <Slider
-              label="Location update interval"
-              hint="How often each phone sends a location sample to the field."
-              value={settings.locationIntervalSec}
-              min={2}
-              max={15}
-              step={1}
-              onChange={(value) => set("locationIntervalSec", value)}
-              display={`${settings.locationIntervalSec} s`}
-              minLabel="2 s"
-              maxLabel="15 s"
-              compact={compact}
-            />
-            <div className={cn("my-4 hairline", compact && "my-2")} />
-            <Slider
-              label="Compass refresh"
-              hint="How often runner bearings are recalculated."
-              value={settings.compassIntervalSec}
-              min={1}
-              max={10}
-              step={1}
-              onChange={(value) => set("compassIntervalSec", value)}
-              display={`${settings.compassIntervalSec} s`}
-              minLabel="1 s"
-              maxLabel="10 s"
-              compact={compact}
-            />
-            <div className={cn("my-4 hairline", compact && "my-2")} />
-            <NumberStepper
-              label="Maximum players"
-              hint="Includes both hunters and runners."
-              value={settings.maxPlayers}
-              min={2}
-              max={20}
-              step={1}
-              onChange={(value) => set("maxPlayers", value)}
-              display={`${settings.maxPlayers}`}
-            />
-            <div className="mt-3 rounded-[2px] border border-line bg-canvas/30 px-3 py-2.5">
-              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-faint">
-                Estimated intel events
-              </p>
-              <p className="mt-1 font-mono text-sm tabular text-ink">
-                {estimatedPings} pings <span className="text-faint">/ round</span>
-              </p>
-            </div>
+          {settings.zoneEnabled ? (
+            <>
+              <div className={cn("hairline", compact && "my-1.5")} />
+
+              <CompactSlider
+                label="Shrink interval"
+                hint="How often the boundary moves inward."
+                value={settings.zoneShrinkIntervalSec}
+                min={ZONE_MIN_INTERVAL_SEC}
+                max={ZONE_MAX_INTERVAL_SEC}
+                step={30}
+                onChange={(value) => set("zoneShrinkIntervalSec", value)}
+                display={`${Math.round(settings.zoneShrinkIntervalSec / 60)} min`}
+                minLabel="1 min"
+                maxLabel="15 min"
+                accent="var(--warning)"
+                compact={compact}
+              />
+              <PresetChips
+                options={[
+                  { label: "Fast · 2m", value: 120 },
+                  { label: "Normal · 5m", value: 300 },
+                  { label: "Slow · 10m", value: 600 },
+                ]}
+                value={settings.zoneShrinkIntervalSec}
+                onChange={(value) => set("zoneShrinkIntervalSec", value)}
+                className={compact ? "gap-1" : undefined}
+              />
+
+              <div className={cn("hairline", compact && "my-1.5")} />
+
+              <CompactSlider
+                label="Shrink step"
+                hint="Radius lost on every contraction."
+                value={settings.zoneShrinkStepM}
+                min={ZONE_MIN_STEP_M}
+                max={ZONE_MAX_STEP_M}
+                step={25}
+                onChange={(value) => set("zoneShrinkStepM", value)}
+                display={`−${settings.zoneShrinkStepM} m`}
+                minLabel="25 m"
+                maxLabel="1000 m"
+                accent="var(--warning)"
+                compact={compact}
+              />
+
+              <div className={cn("hairline", compact && "my-1.5")} />
+
+              <CompactSlider
+                label="Final radius"
+                hint="Smallest the field ever gets. The zone stops here."
+                value={settings.zoneFinalRadiusM}
+                min={ZONE_MIN_FINAL_M}
+                max={Math.max(ZONE_MIN_FINAL_M + 50, settings.playAreaM)}
+                step={25}
+                onChange={(value) => set("zoneFinalRadiusM", value)}
+                display={formatRadius(settings.zoneFinalRadiusM, units)}
+                minLabel="50 m"
+                maxLabel={formatRadius(settings.playAreaM, units)}
+                accent="var(--warning)"
+                compact={compact}
+              />
+
+              <div
+                className={cn(
+                  "rounded-[2px] border px-3 py-2.5",
+                  zoneFit.fits
+                    ? "border-line bg-canvas/30"
+                    : "border-warning/40 bg-warning/[0.06]",
+                )}
+              >
+                <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-faint">
+                  Zone schedule
+                </p>
+                <p className="mt-1 font-mono text-sm tabular text-ink">
+                  {zoneScheduleLabel(settings)}
+                </p>
+                <p className="mt-1 text-[10px] leading-relaxed text-muted">
+                  {formatRadius(settings.playAreaM, units)} shrinks to{" "}
+                  {formatRadius(settings.zoneFinalRadiusM, units)} in{" "}
+                  {zoneFit.totalShrinkCount} steps.
+                </p>
+                {zoneFit.fits ? (
+                  <p className="mt-1 text-[10px] leading-relaxed text-muted">
+                    Finishes at{" "}
+                    <span className="text-ink">
+                      {formatDurationLabel(Math.round(zoneFit.completesAtSec / 60))}
+                    </span>{" "}
+                    into a {formatDurationLabel(durationMinutes)} round.
+                  </p>
+                ) : (
+                  <div className="mt-2 flex items-start gap-1.5 border-t border-warning/20 pt-2">
+                    <TriangleAlert className="mt-0.5 size-3 shrink-0 text-warning" />
+                    <p className="text-[10px] leading-relaxed text-warning">
+                      Schedule runs past the round by{" "}
+                      {formatDurationLabel(Math.round(zoneFit.overflowSec / 60))}.
+                      Only {zoneFit.completedShrinkCount} of {zoneFit.totalShrinkCount}{" "}
+                      contractions land inside the round. Shorten the interval or
+                      extend the round.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : null}
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        icon={SlidersHorizontal}
+        index="04"
+        title="Advanced protocol"
+        summary="Update rate, player cap, sensor cadence."
+        expanded={open.advanced}
+        onToggle={() => toggle("advanced")}
+        compact={compact}
+      >
+        <div className={cn("space-y-4", compact && "space-y-3")}>
+          <CompactSlider
+            label="Location update interval"
+            hint="How often each phone sends a location sample to the field."
+            value={settings.locationIntervalSec}
+            min={2}
+            max={15}
+            step={1}
+            onChange={(value) => set("locationIntervalSec", value)}
+            display={`${settings.locationIntervalSec} s`}
+            minLabel="2 s"
+            maxLabel="15 s"
+            compact={compact}
+          />
+          <div className={cn("hairline", compact && "my-1.5")} />
+          <CompactSlider
+            label="Compass refresh"
+            hint="How often runner bearings are recalculated."
+            value={settings.compassIntervalSec}
+            min={1}
+            max={10}
+            step={1}
+            onChange={(value) => set("compassIntervalSec", value)}
+            display={`${settings.compassIntervalSec} s`}
+            minLabel="1 s"
+            maxLabel="10 s"
+            compact={compact}
+          />
+          <div className={cn("hairline", compact && "my-1.5")} />
+          <NumberStepper
+            label="Maximum players"
+            hint="Includes both hunters and runners."
+            value={settings.maxPlayers}
+            min={2}
+            max={20}
+            step={1}
+            onChange={(value) => set("maxPlayers", value)}
+            display={`${settings.maxPlayers}`}
+          />
+          <div className="rounded-[2px] border border-line bg-canvas/30 px-3 py-2.5">
+            <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-faint">
+              Estimated intel events
+            </p>
+            <p className="mt-1 font-mono text-sm tabular text-ink">
+              {estimatedPings} pings <span className="text-faint">/ round</span>
+            </p>
           </div>
-        ) : null}
-      </Card>
+        </div>
+      </CollapsibleSection>
     </div>
   );
 }
 
-function Section({
+/**
+ * Slider that hides its hint text unless the row is hovered or focused, so a
+ * stack of sliders stays visually compact while the guidance stays reachable.
+ */
+function CompactSlider({
+  hint,
+  ...props
+}: React.ComponentProps<typeof Slider> & { hint?: string }) {
+  if (!hint) return <Slider {...props} />;
+
+  return (
+    <div className="group/slider">
+      <Slider {...props} hint={undefined} />
+      <p className="hidden text-[10px] leading-relaxed text-muted group-hover/slider:block group-focus-within/slider:block [@media(hover:none)]:block">
+        {hint}
+      </p>
+    </div>
+  );
+}
+
+function CollapsibleSection({
   icon: Icon,
   index,
   title,
-  description,
+  summary,
   children,
+  expanded,
+  onToggle,
   compact,
+  accent,
 }: {
   icon: LucideIcon;
   index: string;
   title: string;
-  description: string;
+  summary: string;
   children: React.ReactNode;
+  expanded: boolean;
+  onToggle: () => void;
   compact?: boolean;
+  accent?: "runner" | "hunter";
 }) {
   return (
-    <Card corners className={cn("p-5", compact && "p-4")}>
-      <div className={cn("mb-5 flex items-start justify-between gap-4 border-b border-line pb-4", compact && "mb-4 pb-3")}>
-        <div className="flex gap-3">
-          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-[2px] border border-line bg-surface-2 text-muted">
-            <Icon className="size-3.5" />
-          </span>
-          <div>
-            <h2 className={cn("font-display font-semibold uppercase tracking-[0.04em] text-ink", compact ? "text-base" : "text-lg")}>
+    <Card corners className="overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className={cn(
+          "flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2/40",
+          compact && "px-3.5 py-2",
+        )}
+      >
+        <span
+          className={cn(
+            "flex size-7 shrink-0 items-center justify-center rounded-[2px] border bg-surface-2",
+            accent === "runner"
+              ? "border-runner/30 text-runner"
+              : "border-line text-muted",
+          )}
+        >
+          <Icon className="size-3.5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline gap-2">
+            <span className="font-display text-sm font-semibold uppercase tracking-[0.04em] text-ink">
               {title}
-            </h2>
-            <p className={cn("mt-1 max-w-md leading-relaxed text-muted", compact ? "text-[10px]" : "text-[11px]")}>
-              {description}
-            </p>
-          </div>
+            </span>
+            <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
+              {index}
+            </span>
+          </span>
+          <span className="mt-0.5 block truncate font-mono text-[8px] uppercase tracking-[0.12em] text-muted">
+            {summary}
+          </span>
+        </span>
+        <ChevronDown
+          className={cn(
+            "size-4 shrink-0 text-faint transition-transform duration-200",
+            expanded && "rotate-180",
+          )}
+        />
+      </button>
+
+      {expanded ? (
+        <div className={cn("border-t border-line px-4 py-3.5", compact && "px-3.5 py-3")}>
+          {children}
         </div>
-        <span className="font-mono text-[9px] tabular text-faint">{index}</span>
-      </div>
-      {children}
+      ) : null}
     </Card>
   );
 }
@@ -310,6 +502,11 @@ export function SettingsSummary({ compact }: { compact?: boolean }) {
     },
     { label: "Field", value: formatRadius(settings.playAreaM, units), icon: Map },
     { label: "Intel", value: settings.showAllHuntersToRunners ? "All hunters" : "Compass only", icon: Crosshair },
+    {
+      label: "Zone",
+      value: settings.zoneEnabled ? "Shrinking" : "Static",
+      icon: Shrink,
+    },
   ];
 
   return (
@@ -359,6 +556,7 @@ export function RulesChips() {
       <Chip>{Math.round(settings.durationSec / 60)}m round</Chip>
       <Chip tone="runner">Private tag code</Chip>
       <Chip>{settings.showAllHuntersToRunners ? "Hunter map on" : "Hunter map off"}</Chip>
+      {settings.zoneEnabled ? <Chip tone="warning">Zone shrinking</Chip> : null}
     </div>
   );
 }

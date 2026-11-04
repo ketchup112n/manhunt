@@ -20,6 +20,7 @@ import {
 import { CompassDial } from "@/components/game/CompassDial";
 import { EndMatchModal } from "@/components/game/EndMatchModal";
 import { RunnerMap } from "@/components/game/RunnerMap";
+import { ZonePanel, ZoneRuleNote, ZoneStatusChip } from "@/components/game/ZoneHud";
 import { RoleBadge } from "@/components/hud/RoleBadge";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
@@ -33,7 +34,7 @@ import {
   formatLongClock,
   formatRadius,
 } from "@/lib/geo";
-import { useGame, useYou } from "@/store/game";
+import { useGame, useYou, useZoneState } from "@/store/game";
 import { usePreferences } from "@/store/preferences";
 import { cn } from "@/lib/cn";
 
@@ -50,6 +51,7 @@ export function RunnerPage() {
   const pingExpiresAt = useGame((state) => state.pingExpiresAt);
   const deviceHeading = useGame((state) => state.deviceHeading);
   const phase = useGame((state) => state.phase);
+  const zone = useZoneState();
   const units = usePreferences((state) => state.units);
   const northUp = usePreferences((state) => state.northUp);
   const setPreference = usePreferences((state) => state.setPreference);
@@ -131,6 +133,8 @@ export function RunnerPage() {
         </div>
 
         <div className="flex items-center gap-1.5">
+          <ZoneStatusChip tone="runner" />
+
           <div className="flex items-center gap-1.5 rounded-[3px] border border-line-strong/60 bg-surface/85 px-2.5 py-1.5 backdrop-blur">
             <Clock3 className="size-3.5 text-faint" />
             <div>
@@ -253,6 +257,8 @@ export function RunnerPage() {
           </Card>
 
           <aside className="space-y-3">
+            <ZonePanel tone="runner" />
+
             <ExposureCard
               nextPingSec={nextPingSec}
               lastPingAgo={lastPingAgo}
@@ -324,7 +330,13 @@ export function RunnerPage() {
                   Play area
                 </span>
                 <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-runner">
-                  Inside boundary
+                  {zone.enabled
+                    ? zone.phase === "closed"
+                      ? "Boundary closed"
+                      : zone.isShrinking
+                        ? "Shrinking now"
+                        : "Holding"
+                    : `Static · ${formatRadius(settings.playAreaM, units)}`}
                 </span>
               </div>
               <div className="mt-2 flex items-center gap-1">
@@ -333,7 +345,13 @@ export function RunnerPage() {
                     key={index}
                     className={cn(
                       "h-1 flex-1 rounded-full",
-                      index < 15 ? "bg-runner/60" : "bg-line-strong",
+                      zone.enabled
+                        ? index < Math.round(zone.overallProgress * 18)
+                          ? "bg-warning/70"
+                          : "bg-line-strong"
+                        : index < 15
+                          ? "bg-runner/60"
+                          : "bg-line-strong",
                     )}
                   />
                 ))}
@@ -428,6 +446,15 @@ export function RunnerPage() {
           <RuleRow label="Round duration" value={formatLongClock(settings.durationSec)} />
           <RuleRow label="Play area" value={`${formatRadius(settings.playAreaM, units)} radius`} />
           <RuleRow
+            label="Shrinking zone"
+            value={
+              zone.enabled
+                ? `On · −${zone.shrinkStepM} m / ${Math.round(zone.intervalSec / 60)} min`
+                : "Off"
+            }
+            accent={zone.enabled ? "runner" : undefined}
+          />
+          <RuleRow
             label="Hunter tracking"
             value={settings.showHunterTeammates ? "Visible" : "Hidden"}
           />
@@ -445,6 +472,7 @@ export function RunnerPage() {
           is enabled, runners see anonymous hunter markers with bearing and
           distance. Hunter names are never exposed.
         </p>
+        <ZoneRuleNote tone="runner" />
       </Modal>
       <EndMatchModal open={endMatchOpen} onClose={() => setEndMatchOpen(false)} />
     </div>

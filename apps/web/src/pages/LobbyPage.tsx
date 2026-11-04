@@ -18,9 +18,12 @@ import {
   Radio,
   Settings2,
   ShieldCheck,
+  Shrink,
   Sun,
+  TriangleAlert,
   UserPlus,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Button } from "@/components/ui/Button";
@@ -37,6 +40,7 @@ import {
 } from "@/components/game/SettingsEditor";
 import { useGame, useYou } from "@/store/game";
 import { formatClock } from "@/lib/geo";
+import { zoneScheduleFit, zoneScheduleLabel } from "@/lib/zone";
 import type { Player, Role as RoleType } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -67,6 +71,7 @@ export function LobbyPage() {
   const hasHunters = hunters.length > 0;
   const hasRunners = runners.length > 0;
   const canStart = hasHunters && hasRunners;
+  const zoneFit = zoneScheduleFit(settings);
 
   useEffect(() => {
     if (!prepOpen) return;
@@ -164,7 +169,7 @@ export function LobbyPage() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           <MetaStat label="Players" value={`${players.length} / ${settings.maxPlayers}`} icon={Users} />
           <MetaStat
             label="Ready"
@@ -182,6 +187,12 @@ export function LobbyPage() {
             label="Round"
             value={`${Math.round(settings.durationSec / 60)} min`}
             icon={Radio}
+          />
+          <MetaStat
+            label="Zone"
+            value={settings.zoneEnabled ? "Shrinking" : "Static"}
+            icon={Shrink}
+            tone={settings.zoneEnabled ? "runner" : undefined}
           />
         </div>
 
@@ -234,13 +245,8 @@ export function LobbyPage() {
 
           <aside className="space-y-3 lg:sticky lg:top-4">
             <Card corners className="overflow-hidden">
-              <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
-                <div>
-                  <p className="label-mono mb-1.5">Mission rules</p>
-                  <p className="font-display text-lg font-semibold uppercase tracking-[0.04em] text-ink">
-                    Standard protocol
-                  </p>
-                </div>
+              <div className="flex items-center justify-between gap-3 border-b border-line px-3.5 py-2.5">
+                <p className="label-mono">Mission rules</p>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -250,9 +256,22 @@ export function LobbyPage() {
                   Edit
                 </Button>
               </div>
-              <div className="p-4">
+              <div className="p-3">
                 <SettingsSummary compact />
-                <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
+                <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5">
+                  <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
+                    Shrinking zone
+                  </span>
+                  <span
+                    className={cn(
+                      "font-mono text-[8px] uppercase tracking-[0.12em]",
+                      settings.zoneEnabled ? "text-runner" : "text-faint",
+                    )}
+                  >
+                    {zoneScheduleLabel(settings)}
+                  </span>
+                </div>
+                <div className="mt-2.5 flex items-center justify-between border-t border-line pt-2.5">
                   <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
                     Host editable
                   </span>
@@ -260,6 +279,17 @@ export function LobbyPage() {
                     Until deploy
                   </span>
                 </div>
+                {!zoneFit.fits ? (
+                  <div className="mt-2.5 flex items-start gap-1.5 rounded-[2px] border border-warning/40 bg-warning/[0.06] px-2.5 py-2">
+                    <TriangleAlert className="mt-0.5 size-3 shrink-0 text-warning" />
+                    <p className="text-[10px] leading-relaxed text-warning">
+                      Zone schedule overruns the round by{" "}
+                      {Math.max(1, Math.round(zoneFit.overflowSec / 60))} min. Only{" "}
+                      {zoneFit.completedShrinkCount} of {zoneFit.totalShrinkCount}{" "}
+                      contractions land in play.
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </Card>
 
@@ -391,7 +421,7 @@ function MetaStat({
 }: {
   label: string;
   value: string;
-  icon: typeof Users;
+  icon: LucideIcon;
   tone?: "hunter" | "runner";
 }) {
   return (
