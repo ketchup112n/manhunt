@@ -146,7 +146,7 @@ export function SettingsPage() {
             <SettingSection
               icon={Smartphone}
               title="Sensors"
-              description="Real permissions will be requested in the functional build."
+              description="Location is requested when the round starts. Other sensors are not wired up yet."
             >
               <div className="space-y-2">
                 <PermissionLine icon={MapPin} label="Precise location" />
@@ -157,8 +157,9 @@ export function SettingsPage() {
               <div className="mt-3 flex items-start gap-2 rounded-[3px] border border-info/20 bg-info/5 px-3 py-2.5">
                 <Info className="mt-0.5 size-3.5 shrink-0 text-info" />
                 <p className="text-[10px] leading-relaxed text-muted">
-                  iOS requires a tap to enable compass access. This build
-                  simulates sensor values and never requests permissions.
+                  iOS requires a tap to enable compass access. This build uses
+                  real device location for the field map; compass values are
+                  still simulated.
                 </p>
               </div>
             </SettingSection>

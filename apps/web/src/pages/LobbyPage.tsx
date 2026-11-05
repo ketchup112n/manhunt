@@ -386,8 +386,8 @@ export function LobbyPage() {
               <PermissionRow icon={Compass} label="Compass access" />
               <PermissionRow icon={Sun} label="Screen wake lock" />
               <p className="mt-3 border-t border-line pt-3 font-mono text-[8px] leading-relaxed tracking-[0.1em] text-faint">
-                Sensors are simulated in this build. On phones, permissions
-                require a secure HTTPS connection.
+                Location is requested when the round starts. On phones,
+                permissions require a secure HTTPS connection.
               </p>
             </Card>
 

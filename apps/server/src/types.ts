@@ -39,6 +39,19 @@ export const DEFAULT_SETTINGS: GameSettings = {
   zoneFinalRadiusM: 100,
 };
 
+export interface GeoPosition {
+  lat: number;
+  lng: number;
+  accuracyM: number;
+  /** Epoch milliseconds when the device reported this fix. */
+  at: number;
+}
+
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
 /** Player shape sent to clients. PINs are only included for their owner (or dev clients). */
 export interface PublicPlayer {
   id: string;
@@ -51,6 +64,8 @@ export interface PublicPlayer {
   avatar: string;
   connected: boolean;
   tagCode?: string;
+  /** Present only when this viewer is allowed to see the player's location. */
+  position?: GeoPosition;
 }
 
 export interface Snapshot {
@@ -67,6 +82,10 @@ export interface Snapshot {
   pingCount: number;
   pingExpiresInMs: number;
   resultWinner: Winner | null;
+  /** Arena anchor captured when the round starts, if anyone had a GPS fix. */
+  center: LatLng | null;
+  /** Bearing and range to the closest hunter, for runners without hunter intel. */
+  nearestHunter: { bearing: number; distanceM: number; updatedAt: number } | null;
 }
 
 export interface Session {
@@ -88,6 +107,7 @@ export type ClientMessage =
   | { type: "start" }
   | { type: "skipPrep" }
   | { type: "ping" }
+  | { type: "updateLocation"; lat: number; lng: number; accuracyM: number }
   | { type: "submitTag"; code: string }
   | { type: "endGame"; winner: Winner }
   | { type: "fillBots"; count?: number }

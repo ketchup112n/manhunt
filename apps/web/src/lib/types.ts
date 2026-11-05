@@ -27,6 +27,14 @@ export interface GameSettings {
   zoneFinalRadiusM: number;
 }
 
+export interface GeoPosition {
+  lat: number;
+  lng: number;
+  accuracyM: number;
+  /** Epoch milliseconds when the device reported this fix. */
+  at: number;
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -40,6 +48,8 @@ export interface Player {
   /** Only present for the player who owns the PIN (and dev snapshots). */
   tagCode?: string;
   connected: boolean;
+  /** Present only when this viewer is allowed to see the player's location. */
+  position?: GeoPosition;
 }
 
 export interface LatLng {
@@ -83,6 +93,8 @@ export interface Snapshot {
   pingCount: number;
   pingExpiresInMs: number;
   resultWinner: Winner | null;
+  center: LatLng | null;
+  nearestHunter: { bearing: number; distanceM: number; updatedAt: number } | null;
 }
 
 export type TagResult =
@@ -98,6 +110,7 @@ export type ClientMessage =
   | { type: "start" }
   | { type: "skipPrep" }
   | { type: "ping" }
+  | { type: "updateLocation"; lat: number; lng: number; accuracyM: number }
   | { type: "submitTag"; code: string }
   | { type: "endGame"; winner: Winner }
   | { type: "fillBots"; count?: number }

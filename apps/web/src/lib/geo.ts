@@ -80,66 +80,28 @@ export function formatAgo(seconds: number): string {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s ago`;
 }
 
-export const DEMO_CENTER = { lat: 40.7829, lng: -73.9654 };
-
-export interface SimulatedPosition extends LatLng {
+export interface PositionedPlayer extends LatLng {
   id: string;
   name: string;
   accuracyM: number;
+  updatedAt: number;
 }
 
-/**
- * Deterministic placeholder positions. Real geolocation is not wired up yet,
- * so every joined player gets a stable offset around the staging point. The
- * same id always maps to the same spot, which keeps markers from jumping on
- * every snapshot.
- */
-function hashId(id: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < id.length; index += 1) {
-    hash ^= id.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-export function getPlayerPosition(
-  id: string,
-  name = "PLAYER",
-): SimulatedPosition {
-  const hash = hashId(id);
-  const angle = ((hash % 360) * Math.PI) / 180;
-  const distanceM = 45 + ((hash >>> 9) % 340);
-  const northM = Math.cos(angle) * distanceM;
-  const eastM = Math.sin(angle) * distanceM;
-  const lat = DEMO_CENTER.lat + northM / 111_320;
-  const lng =
-    DEMO_CENTER.lng +
-    eastM / (111_320 * Math.cos((DEMO_CENTER.lat * Math.PI) / 180));
-
+/** Flatten a player's last server-known fix into something a map can render. */
+export function toPositionedPlayer(player: {
+  id: string;
+  name: string;
+  position?: { lat: number; lng: number; accuracyM: number; at: number };
+}): PositionedPlayer | null {
+  if (!player.position) return null;
   return {
-    id,
-    name,
-    lat,
-    lng,
-    accuracyM: 6 + ((hash >>> 17) % 16),
+    id: player.id,
+    name: player.name,
+    lat: player.position.lat,
+    lng: player.position.lng,
+    accuracyM: player.position.accuracyM,
+    updatedAt: player.position.at,
   };
-}
-
-export function getHunterPositions(
-  players: { id: string; name?: string }[],
-): SimulatedPosition[] {
-  return players.map((player) =>
-    getPlayerPosition(player.id, player.name ?? player.id.slice(0, 4).toUpperCase()),
-  );
-}
-
-export function getRunnerPositions(
-  players: { id: string; name?: string }[],
-): SimulatedPosition[] {
-  return players.map((player) =>
-    getPlayerPosition(player.id, player.name ?? player.id.slice(0, 4).toUpperCase()),
-  );
 }
 
 export function nearestHunter(

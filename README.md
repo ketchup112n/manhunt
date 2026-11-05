@@ -2,7 +2,7 @@
 
 A mobile-first, realtime lobby for a real-world manhunt game. Hosts create a lobby, share a six-character code, assign players to teams, and deploy the round. Hunters receive periodic runner location pings and register catches with a runner-only PIN. Runners get a compass, a private tag code, and an optional shrinking play area.
 
-Lobby state, timers, pings, and PIN validation live on a small WebSocket server, so players on different devices can join the same game. Locations and compass headings are still simulated; real geolocation and device sensors are not wired up yet.
+Lobby state, timers, pings, and PIN validation live on a small WebSocket server, so players on different devices can join the same game. Player positions come from the device GPS while a round is running; compass headings are still simulated.
 
 ## Quick start
 
@@ -153,6 +153,9 @@ The dev console (right-edge **Demo** tab, development builds only) can fill the 
 - The server sends a player's PIN only to that player.
 - In development, `npm run dev` sets `MANHUNT_DEV_PINS=true`, so the demo console can show every PIN. The production `start` script leaves the flag off.
 - Session tokens are bearer credentials for the socket; they are not passwords and are only stored locally.
+- Location is requested only while the round is in prep or active. The server never asks for a fix before the host deploys.
+- Visibility is enforced server-side: you always see yourself; hunters see hunter teammates and runners only during a ten-second ping window; runners see their squad and, when the host enables all-hunter intel, anonymous hunter markers. Caught and unassigned players never share a position.
+- The arena center is anchored from the host's fix, then the first available fix, then the first fix received during prep or the round.
 - Teams and settings are host-controlled. The server rejects team changes, rule edits, and early endings from other players.
 
 ### Shrinking zone
@@ -190,7 +193,7 @@ apps/
   web/
     src/
       components/   brand, game HUD, zone HUD, layout, UI primitives
-      lib/          types, geo math, simulated positions, zone schedule, utilities
+      lib/          types, geo math, position helpers, zone schedule, utilities
       pages/        route screens
       store/        Zustand realtime session and preferences
       styles/       tokens, themes, HUD textures, Leaflet styling
@@ -199,7 +202,7 @@ apps/
 ## Current limitations
 
 - **No accounts or persistence.** Lobbies live in server memory and disappear after six idle hours or a server restart. A restart requires players to join again.
-- **Simulated location and sensors.** Positions are deterministic offsets around a staging point and compass headings are simulated. No browser geolocation or orientation APIs are used.
+- **GPS requires permission and HTTPS.** The browser geolocation API streams precise fixes to the server during prep and the active round. Denied or unavailable fixes surface as an in-game banner. Device orientation is still simulated.
 - **No pressure testing.** One process, in-memory state, and no rate limiting; suitable for a friend-group game, not a public deployment.
 - **Map tiles require network access.** Leaflet renders OpenStreetMap tiles with a CSS filter for the dark theme.
 - **Basic resilience only.** The client reconnects with backoff, but the host keeps their role while offline and there is no host migration during a round.
@@ -207,7 +210,6 @@ apps/
 
 ## Next steps
 
-- Geolocation ingestion with real ping positions
 - Device orientation permissions and compass calibration
 - Redis-backed rooms or a database for persistence across restarts
 - Authentication, rate limiting, and host migration during a round

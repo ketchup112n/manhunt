@@ -4,6 +4,8 @@ import {
   type ClientMessage,
   type GamePhase,
   type GameSettings,
+  type GeoPosition,
+  type LatLng,
   type PublicPlayer,
   type Role,
   type Snapshot,
@@ -45,6 +47,7 @@ export interface LobbyPlayer {
   tagCode: string;
   connected: boolean;
   lastSeen: number;
+  position: GeoPosition | null;
 }
 
 export interface ActionResult {
@@ -78,6 +81,9 @@ export class Lobby {
   private lastPingAt = 0;
   private pingExpiresAt = 0;
   private pingCount = 0;
+  private pingPositions = new Map<string, GeoPosition>();
+  /** Arena anchor captured at deploy time; null until a player has a fix. */
+  center: LatLng | null = null;
   private botCursor = 0;
 
   constructor(options: LobbyOptions) {
@@ -121,6 +127,7 @@ export class Lobby {
       tagCode: this.uniqueTagCode(),
       connected: options.isBot ?? false,
       lastSeen: Date.now(),
+      position: null,
     };
   }
 
@@ -248,10 +255,7 @@ export class Lobby {
         this.finish("runners");
         changed = true;
       } else if (now >= this.nextPingAt) {
-        this.pingCount += 1;
-        this.lastPingAt = now;
-        this.pingExpiresAt = now + 10_000;
-        this.nextPingAt = now + Math.max(1, this.settings.pingSec) * 1000;
+        this.recordPing(now);
         changed = true;
       }
     }
@@ -267,16 +271,51 @@ export class Lobby {
     this.lastPingAt = 0;
     this.pingExpiresAt = 0;
     this.pingCount = 0;
+    this.pingPositions.clear();
+    if (!this.center) this.center = this.anchorFromPlayers();
     for (const player of this.players.values()) {
       player.status = "active";
       player.ready = true;
     }
   }
 
+  /** Capture every active runner's fix at ping time. Hunters see this frozen snapshot. */
+  private recordPing(now: number): void {
+    this.pingCount += 1;
+    this.lastPingAt = now;
+    this.pingExpiresAt = now + 10_000;
+    this.nextPingAt = now + Math.max(1, this.settings.pingSec) * 1000;
+    this.pingPositions.clear();
+    for (const player of this.players.values()) {
+      if (
+        player.role === "runner" &&
+        player.status === "active" &&
+        player.position
+      ) {
+        this.pingPositions.set(player.id, { ...player.position });
+      }
+    }
+  }
+
+  /** Host location first, then any other player who has already shared a fix. */
+  private anchorFromPlayers(): LatLng | null {
+    const hostPosition = this.host?.position;
+    if (hostPosition) {
+      return { lat: hostPosition.lat, lng: hostPosition.lng };
+    }
+    for (const player of this.players.values()) {
+      if (player.position) {
+        return { lat: player.position.lat, lng: player.position.lng };
+      }
+    }
+    return null;
+  }
+
   private finish(winner: Winner): void {
     this.phase = "ended";
     this.resultWinner = winner;
     this.pingExpiresAt = 0;
+    this.pingPositions.clear();
     if (winner === "hunters") {
       for (const player of this.players.values()) {
         if (player.role === "runner") player.status = "caught";
@@ -359,6 +398,7 @@ export class Lobby {
           };
         }
         this.phase = "prep";
+        this.center = this.anchorFromPlayers();
         this.prepEndsAt = Date.now() + Math.max(0, this.settings.prepSec) * 1000;
         this.resultWinner = null;
         if (this.settings.prepSec <= 0) this.beginActive(Date.now());
@@ -382,12 +422,35 @@ export class Lobby {
         if (this.phase !== "active") {
           return { changed: false, error: "Pings only fire during an active round." };
         }
-        const now = Date.now();
-        this.pingCount += 1;
-        this.lastPingAt = now;
-        this.pingExpiresAt = now + 10_000;
-        this.nextPingAt = now + Math.max(1, this.settings.pingSec) * 1000;
+        this.recordPing(Date.now());
         return { changed: true };
+      }
+
+      case "updateLocation": {
+        const lat = Number(message.lat);
+        const lng = Number(message.lng);
+        const accuracyM = Number(message.accuracyM);
+        if (
+          !Number.isFinite(lat) ||
+          !Number.isFinite(lng) ||
+          !Number.isFinite(accuracyM) ||
+          lat < -90 ||
+          lat > 90 ||
+          lng < -180 ||
+          lng > 180
+        ) {
+          return { changed: false, error: "Invalid location fix." };
+        }
+        player.position = {
+          lat,
+          lng,
+          accuracyM: clamp(accuracyM, 0, 5000),
+          at: Date.now(),
+        };
+        if (!this.center && (this.phase === "prep" || this.phase === "active")) {
+          this.center = { lat, lng };
+        }
+        return { changed: false };
       }
 
       case "submitTag": {
@@ -408,6 +471,7 @@ export class Lobby {
         const target = runners.find((runner) => runner.tagCode === code);
         if (!target) return { changed: false, tag: { result: "invalid" } };
         target.status = "caught";
+        this.pingPositions.delete(target.id);
         return {
           changed: true,
           tag: {
@@ -526,6 +590,44 @@ export class Lobby {
           )
         : 0;
 
+    const viewer = this.players.get(viewerId);
+    const viewerRole: Role = viewer?.role ?? "unassigned";
+    const started = this.phase !== "lobby";
+    const pingOpen = this.phase === "active" && this.pingExpiresAt > now;
+
+    /**
+     * Location visibility is decided per viewer:
+     * - you always see yourself;
+     * - hunters see their own team and runners only inside a ping window;
+     * - runners see their squad, plus hunters only when the host enables it;
+     * - caught runners and unassigned players never share a location.
+     */
+    const visiblePosition = (player: LobbyPlayer): GeoPosition | undefined => {
+      if (!player.position) return undefined;
+      if (player.id === viewerId) return player.position;
+      if (!started || player.status === "caught") return undefined;
+
+      if (viewerRole === "hunter") {
+        if (player.role === "hunter") {
+          return this.settings.showHunterTeammates ? player.position : undefined;
+        }
+        if (player.role === "runner" && pingOpen) {
+          return this.pingPositions.get(player.id);
+        }
+        return undefined;
+      }
+
+      if (viewerRole === "runner") {
+        if (player.role === "runner") return player.position;
+        if (player.role === "hunter" && this.settings.showAllHuntersToRunners) {
+          return player.position;
+        }
+        return undefined;
+      }
+
+      return undefined;
+    };
+
     const players: PublicPlayer[] = [...this.players.values()].map((player) => ({
       id: player.id,
       name: player.name,
@@ -538,7 +640,33 @@ export class Lobby {
       connected: player.isBot || player.connected,
       tagCode:
         includeAllPins || player.id === viewerId ? player.tagCode : undefined,
+      position: visiblePosition(player),
     }));
+
+    let nearestHunter: Snapshot["nearestHunter"] = null;
+    if (
+      viewerRole === "runner" &&
+      viewer?.position &&
+      !this.settings.showAllHuntersToRunners
+    ) {
+      let closest: LobbyPlayer | null = null;
+      let closestDistance = Number.POSITIVE_INFINITY;
+      for (const candidate of this.players.values()) {
+        if (candidate.role !== "hunter" || !candidate.position) continue;
+        const distance = distanceMeters(viewer.position, candidate.position);
+        if (distance < closestDistance) {
+          closest = candidate;
+          closestDistance = distance;
+        }
+      }
+      if (closest?.position) {
+        nearestHunter = {
+          bearing: bearingDegrees(viewer.position, closest.position),
+          distanceM: Math.round(closestDistance),
+          updatedAt: closest.position.at,
+        };
+      }
+    }
 
     return {
       code: this.code,
@@ -557,6 +685,8 @@ export class Lobby {
       pingCount: this.pingCount,
       pingExpiresInMs: Math.max(0, this.pingExpiresAt - now),
       resultWinner: this.resultWinner,
+      center: this.center ? { ...this.center } : null,
+      nearestHunter,
     };
   }
 }
@@ -589,6 +719,32 @@ function isRole(value: unknown): value is Role {
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
+}
+
+const EARTH_RADIUS_M = 6_371_000;
+const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+const toDeg = (radians: number) => (radians * 180) / Math.PI;
+
+function distanceMeters(a: LatLng, b: LatLng): number {
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function bearingDegrees(from: LatLng, to: LatLng): number {
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const dLng = toRad(to.lng - from.lng);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
 /**

@@ -170,3 +170,168 @@ test("names and codes are normalized", () => {
   assert.match(code, /^[A-Z0-9]{6}$/);
   assert.notEqual(code, "AAAAAA");
 });
+
+function movePlayer(
+  lobby: Lobby,
+  playerId: string,
+  lat: number,
+  lng: number,
+  accuracyM = 8,
+) {
+  return lobby.handle(playerId, {
+    type: "updateLocation",
+    lat,
+    lng,
+    accuracyM,
+  });
+}
+
+test("location fixes are validated, clamped, and private", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const guest = lobby.addPlayer("ROOK");
+  assert.ok("id" in guest);
+
+  const invalid = movePlayer(lobby, hostId, 120, 0);
+  assert.equal(invalid.error, "Invalid location fix.");
+
+  const valid = movePlayer(lobby, hostId, 40.7, -74, 9000);
+  assert.equal(valid.error, undefined);
+  assert.equal(lobby.host?.position?.accuracyM, 5000);
+  assert.equal(lobby.host?.position?.lat, 40.7);
+
+  const ownSnapshot = lobby.snapshotFor(hostId, false);
+  assert.ok(
+    ownSnapshot.players.find((player) => player.id === hostId)?.position,
+  );
+
+  const guestSnapshot = lobby.snapshotFor(guest.id, false);
+  assert.equal(
+    guestSnapshot.players.find((player) => player.id === hostId)?.position,
+    undefined,
+  );
+});
+
+test("the arena center anchors from the host, then the first fix", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const runner = [...lobby.players.values()].find(
+    (player) => player.role === "runner",
+  )!;
+
+  movePlayer(lobby, runner.id, 10, 10);
+  assert.equal(lobby.center, null);
+
+  movePlayer(lobby, hostId, 40.71, -74);
+  lobby.handle(hostId, { type: "start" });
+  assert.deepEqual(lobby.center, { lat: 40.71, lng: -74 });
+
+  const fallback = lobbyWithPlayers(1);
+  const fallbackRunner = [...fallback.lobby.players.values()].find(
+    (player) => player.role === "runner",
+  )!;
+  fallback.lobby.handle(fallback.hostId, { type: "start" });
+  assert.equal(fallback.lobby.center, null);
+
+  movePlayer(fallback.lobby, fallbackRunner.id, 51.5, -0.12);
+  assert.deepEqual(fallback.lobby.center, { lat: 51.5, lng: -0.12 });
+});
+
+test("hunters see runners only during a ping window, frozen at ping time", () => {
+  const { lobby, hostId } = lobbyWithPlayers(2);
+  const runners = [...lobby.players.values()].filter(
+    (player) => player.role === "runner",
+  );
+  lobby.handle(hostId, { type: "start" });
+
+  runners.forEach((runner, index) => {
+    movePlayer(lobby, runner.id, 40.7 + index * 0.001, -74);
+  });
+
+  const hidden = lobby.snapshotFor(hostId, false);
+  assert.equal(
+    hidden.players.find((player) => player.id === runners[0].id)?.position,
+    undefined,
+  );
+
+  lobby.handle(hostId, { type: "ping" });
+  const pinged = lobby.snapshotFor(hostId, false);
+  const frozen = pinged.players.find(
+    (player) => player.id === runners[0].id,
+  )?.position;
+  assert.equal(frozen?.lat, 40.7);
+
+  movePlayer(lobby, runners[0].id, 41, -75);
+  const stillFrozen = lobby.snapshotFor(hostId, false);
+  assert.equal(
+    stillFrozen.players.find((player) => player.id === runners[0].id)?.position
+      ?.lat,
+    40.7,
+  );
+
+  const tag = lobby.handle(hostId, {
+    type: "submitTag",
+    code: runners[0].tagCode,
+  });
+  assert.equal(tag.tag?.result, "success");
+  const caught = lobby.snapshotFor(hostId, false);
+  assert.equal(
+    caught.players.find((player) => player.id === runners[0].id)?.position,
+    undefined,
+  );
+});
+
+test("runners see their squad and the nearest hunter bearing", () => {
+  const { lobby, hostId } = lobbyWithPlayers(2);
+  const runners = [...lobby.players.values()].filter(
+    (player) => player.role === "runner",
+  );
+  movePlayer(lobby, hostId, 40.7, -74);
+  movePlayer(lobby, runners[0].id, 40.7005, -74);
+  movePlayer(lobby, runners[1].id, 40.702, -74);
+  lobby.handle(hostId, { type: "start" });
+
+  const snapshot = lobby.snapshotFor(runners[0].id, false);
+  const byId = new Map(snapshot.players.map((player) => [player.id, player]));
+
+  assert.ok(byId.get(runners[0].id)?.position);
+  assert.ok(byId.get(runners[1].id)?.position);
+  assert.equal(byId.get(hostId)?.position, undefined);
+  assert.ok(snapshot.nearestHunter);
+  assert.ok(snapshot.nearestHunter.distanceM > 40);
+  assert.ok(snapshot.nearestHunter.distanceM < 70);
+});
+
+test("all-hunter intel reveals hunter positions and hides the nearest hint", () => {
+  const lobby = new Lobby({
+    code: "XYZ123",
+    hostName: "ECHO",
+    settings: {
+      ...DEFAULT_SETTINGS,
+      prepSec: 0,
+      showAllHuntersToRunners: true,
+    },
+  });
+  const host = lobby.host!;
+  const guest = lobby.addPlayer("ROOK");
+  assert.ok("id" in guest);
+  lobby.handle(host.id, {
+    type: "assignRole",
+    playerId: guest.id,
+    role: "runner",
+  });
+  lobby.handle(host.id, {
+    type: "assignRole",
+    playerId: host.id,
+    role: "hunter",
+  });
+
+  movePlayer(lobby, host.id, 40.7, -74);
+  movePlayer(lobby, guest.id, 40.701, -74);
+  lobby.handle(host.id, { type: "start" });
+
+  const snapshot = lobby.snapshotFor(guest.id, false);
+  const hostPosition = snapshot.players.find(
+    (player) => player.id === host.id,
+  )?.position;
+  assert.ok(hostPosition);
+  assert.equal(snapshot.nearestHunter, null);
+});

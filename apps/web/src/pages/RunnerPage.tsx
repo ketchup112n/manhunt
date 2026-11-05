@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { CompassDial } from "@/components/game/CompassDial";
 import { EndMatchModal } from "@/components/game/EndMatchModal";
+import { GpsBanner } from "@/components/game/GpsBanner";
 import { RunnerMap } from "@/components/game/RunnerMap";
 import { ZonePanel, ZoneRuleNote, ZoneStatusChip } from "@/components/game/ZoneHud";
 import { RoleBadge } from "@/components/hud/RoleBadge";
@@ -28,14 +29,14 @@ import { Modal } from "@/components/ui/Modal";
 import { Sheet } from "@/components/ui/Sheet";
 import { useToast } from "@/components/ui/Toast";
 import {
-  DEMO_CENTER,
   formatAgo,
   formatClock,
   formatDistance,
   formatLongClock,
   formatRadius,
-  getHunterPositions,
   nearestHunter,
+  toPositionedPlayer,
+  type PositionedPlayer,
 } from "@/lib/geo";
 import { useGame, useYou, useZoneState } from "@/store/game";
 import { usePreferences } from "@/store/preferences";
@@ -54,6 +55,9 @@ export function RunnerPage() {
   const pingExpiresAt = useGame((state) => state.pingExpiresAt);
   const deviceHeading = useGame((state) => state.deviceHeading);
   const phase = useGame((state) => state.phase);
+  const center = useGame((state) => state.center);
+  const livePosition = useGame((state) => state.livePosition);
+  const snapshotNearest = useGame((state) => state.nearestHunter);
   const zone = useZoneState();
   const units = usePreferences((state) => state.units);
   const northUp = usePreferences((state) => state.northUp);
@@ -70,13 +74,37 @@ export function RunnerPage() {
     (player) => player.role === "runner" && player.status === "active",
   );
 
-  const hunterPositions = getHunterPositions(hunters);
-  const nearestInfo = nearestHunter(DEMO_CENTER, hunterPositions);
-  const nearest = nearestInfo
-    ? { bearing: nearestInfo.bearing, distanceM: nearestInfo.distanceM }
-    : { bearing: 0, distanceM: 0 };
+  const self = toPositionedPlayer({
+    id: you?.id ?? "",
+    name: you?.name ?? "YOU",
+    position: livePosition ?? you?.position,
+  });
 
-  const distanceLabel = formatDistance(nearest.distanceM, units);
+  const teammatePositions = activeRunners
+    .filter((player) => player.id !== you?.id)
+    .map(toPositionedPlayer)
+    .filter((player): player is PositionedPlayer => player !== null);
+
+  const visibleHunters = settings.showAllHuntersToRunners
+    ? hunters
+        .map(toPositionedPlayer)
+        .filter((hunter): hunter is PositionedPlayer => hunter !== null)
+    : [];
+
+  // The server computes the nearest hunter for runners without full intel; with
+  // intel enabled the client can work it out from the markers it already has.
+  const nearestInfo =
+    self && visibleHunters.length > 0
+      ? nearestHunter(self, visibleHunters)
+      : snapshotNearest;
+
+  const nearest = {
+    bearing: nearestInfo?.bearing ?? 0,
+    distanceM: nearestInfo?.distanceM ?? null,
+  };
+
+  const distanceLabel =
+    nearest.distanceM === null ? "No intel" : formatDistance(nearest.distanceM, units);
   const pingProgress = settings.pingSec === 0 ? 0 : nextPingSec / settings.pingSec;
   const recentlyLocated = pingWindowOpen && pingCount > 0;
 
@@ -168,13 +196,15 @@ export function RunnerPage() {
             Live field / runner channel
           </div>
           <div className="hidden items-center gap-2 font-mono text-[8px] uppercase tracking-[0.18em] text-faint sm:flex">
-            <span>Sensor simulation</span>
+            <span>Live GPS</span>
             <span className="h-3 w-px bg-line-strong" />
             <span className={recentlyLocated ? "text-warning" : "text-runner"}>
               {recentlyLocated ? "Exposed" : "Signal secure"}
             </span>
           </div>
         </div>
+
+        <GpsBanner className="mt-3" />
 
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <StatTile
@@ -217,7 +247,7 @@ export function RunnerPage() {
                 <Chip tone={recentlyLocated ? "warning" : "runner"} dot>
                   {recentlyLocated ? "Exposed" : "Tracking"}
                 </Chip>
-                <Chip className="hidden sm:inline-flex">Sensor sim</Chip>
+                <Chip className="hidden sm:inline-flex">Live GPS</Chip>
               </div>
             </div>
 
@@ -229,7 +259,7 @@ export function RunnerPage() {
                   heading={deviceHeading}
                   northUp={northUp}
                   distanceLabel={distanceLabel}
-                  accuracyM={8}
+                  accuracyM={self?.accuracyM ?? 0}
                   pingRemainingSec={nextPingSec}
                   pingTotalSec={settings.pingSec}
                 />
@@ -239,7 +269,10 @@ export function RunnerPage() {
             <div className="grid grid-cols-3 divide-x divide-line border-t border-line">
               <DialStat label="Bearing" value={`${String(Math.round(nearest.bearing)).padStart(3, "0")}°`} />
               <DialStat label="Nearest" value={distanceLabel} tone="runner" />
-              <DialStat label="Accuracy" value="±8 m" />
+              <DialStat
+                label="Accuracy"
+                value={self ? `±${Math.round(self.accuracyM)} m` : "No fix"}
+              />
             </div>
 
             <div className="flex flex-col gap-2 border-t border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -290,11 +323,12 @@ export function RunnerPage() {
               </div>
               <div className="mt-3">
                 <RunnerMap
-                  hunters={hunters}
-                  runners={activeRunners}
-                  selfId={you?.id ?? ""}
-                  showHunters={settings.showAllHuntersToRunners}
+                  self={self}
+                  teammates={teammatePositions}
+                  hunters={visibleHunters}
+                  center={center}
                   playAreaM={settings.playAreaM}
+                  pingKey={pingCount}
                 />
               </div>
               {!settings.showAllHuntersToRunners ? (
@@ -478,7 +512,7 @@ export function RunnerPage() {
         <p className="mt-4 border-t border-line pt-3 font-mono text-[8px] uppercase leading-relaxed tracking-[0.12em] text-faint">
           Compass bearings point to the nearest hunter. When all-hunter intel
           is enabled, runners see anonymous hunter markers with bearing and
-          distance. Hunter names are never exposed.
+          distance.
         </p>
         <ZoneRuleNote tone="runner" />
       </Modal>

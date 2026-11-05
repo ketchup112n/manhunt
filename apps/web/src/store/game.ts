@@ -5,6 +5,8 @@ import {
   type ClientMessage,
   type GamePhase,
   type GameSettings,
+  type GeoPosition,
+  type LatLng,
   type LobbySession,
   type Player,
   type Role,
@@ -23,6 +25,14 @@ export type ConnectionState =
   | "connecting"
   | "connected"
   | "disconnected";
+
+export type PositionStatus =
+  | "idle"
+  | "requesting"
+  | "live"
+  | "denied"
+  | "unsupported"
+  | "error";
 
 interface ActionResult {
   ok: boolean;
@@ -51,6 +61,11 @@ interface GameStore {
   tagTargetId: string | null;
   resultWinner: Winner | null;
   deviceHeading: number;
+  center: LatLng | null;
+  nearestHunter: { bearing: number; distanceM: number; updatedAt: number } | null;
+  livePosition: GeoPosition | null;
+  positionStatus: PositionStatus;
+  positionError: string | null;
 
   bootstrap: () => void;
   createLobby: (name: string, settings: GameSettings) => Promise<ActionResult>;
@@ -70,6 +85,9 @@ interface GameStore {
   fillBots: (count?: number) => void;
   removeBots: () => void;
   setDeviceHeading: (heading: number) => void;
+  updateLocation: (lat: number, lng: number, accuracyM: number) => void;
+  setLivePosition: (position: GeoPosition) => void;
+  setPositionStatus: (status: PositionStatus, error?: string | null) => void;
   resetGame: () => void;
   clearActionError: () => void;
 }
@@ -95,6 +113,15 @@ const initialState = {
   tagTargetId: null as string | null,
   resultWinner: null as Winner | null,
   deviceHeading: 24,
+  center: null as LatLng | null,
+  nearestHunter: null as {
+    bearing: number;
+    distanceM: number;
+    updatedAt: number;
+  } | null,
+  livePosition: null as GeoPosition | null,
+  positionStatus: "idle" as PositionStatus,
+  positionError: null as string | null,
 };
 
 let socket: WebSocket | null = null;
@@ -225,6 +252,8 @@ export const useGame = create<GameStore>((set, get) => {
       pingExpiresAt:
         state.pingExpiresInMs > 0 ? Date.now() + state.pingExpiresInMs : 0,
       resultWinner: state.resultWinner,
+      center: state.center,
+      nearestHunter: state.nearestHunter,
       connection: "connected",
       connectionError: null,
     });
@@ -485,6 +514,20 @@ export const useGame = create<GameStore>((set, get) => {
     },
 
     setDeviceHeading: (deviceHeading) => set({ deviceHeading }),
+
+    updateLocation: (lat, lng, accuracyM) => {
+      send({ type: "updateLocation", lat, lng, accuracyM });
+    },
+
+    setLivePosition: (position) =>
+      set({
+        livePosition: position,
+        positionStatus: "live",
+        positionError: null,
+      }),
+
+    setPositionStatus: (positionStatus, positionError = null) =>
+      set({ positionStatus, positionError }),
 
     resetGame: () => {
       get().leaveLobby();

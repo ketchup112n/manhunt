@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { DevPanel } from "@/components/game/DevPanel";
+import { LocationSync } from "@/components/game/LocationSync";
 import { usePreferences } from "@/store/preferences";
 import { useGame, useYou } from "@/store/game";
 import { HomePage } from "@/pages/HomePage";
@@ -112,6 +113,7 @@ export function App() {
     <ToastProvider>
       <ThemeSync />
       <RealtimeSync />
+      <LocationSync />
       <BrowserRouter>
         <ScrollToTop />
         <Routes>
