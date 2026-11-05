@@ -19,7 +19,9 @@ import {
   X,
 } from "lucide-react";
 import { HunterMap } from "@/components/game/HunterMap";
+import { GpsBanner } from "@/components/game/GpsBanner";
 import { EndMatchModal } from "@/components/game/EndMatchModal";
+import { ZonePanel, ZoneRuleNote, ZoneStatusChip } from "@/components/game/ZoneHud";
 import { RoleBadge } from "@/components/hud/RoleBadge";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -28,8 +30,6 @@ import { ProgressRing } from "@/components/ui/ProgressRing";
 import { Sheet } from "@/components/ui/Sheet";
 import { useToast } from "@/components/ui/Toast";
 import {
-  DEMO_CENTER,
-  getRunnerPositions,
   distanceMeters,
   formatAgo,
   formatClock,
@@ -37,7 +37,7 @@ import {
   formatLongClock,
   formatRadius,
 } from "@/lib/geo";
-import { useGame, useYou } from "@/store/game";
+import { useGame, useYou, useZoneState } from "@/store/game";
 import { usePreferences } from "@/store/preferences";
 import type { RunnerSignal } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -55,6 +55,9 @@ export function HunterPage() {
   const pingExpiresAt = useGame((state) => state.pingExpiresAt);
   const endGame = useGame((state) => state.endGame);
   const phase = useGame((state) => state.phase);
+  const center = useGame((state) => state.center);
+  const livePosition = useGame((state) => state.livePosition);
+  const zone = useZoneState();
   const you = useYou();
   const [menuOpen, setMenuOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -70,6 +73,18 @@ export function HunterPage() {
     (player) => player.role === "runner" && player.status === "active",
   );
   const awaitingFirstPing = pingCount === 0;
+
+  /** Prefer the newest device fix over the last one the server echoed back. */
+  const selfFix = livePosition ?? you?.position ?? null;
+  const self = selfFix
+    ? {
+        id: you?.id ?? "",
+        name: you?.name ?? "YOU",
+        lat: selfFix.lat,
+        lng: selfFix.lng,
+        accuracyM: selfFix.accuracyM,
+      }
+    : null;
 
   useEffect(() => {
     if (!pingExpiresAt) return;
@@ -92,19 +107,15 @@ export function HunterPage() {
       !pingWindowOpen
         ? []
         : activeRunners
-            .map((player) => {
-              const position = getRunnerPositions([player]).find((p) => p.id === player.id);
-              if (!position) return null;
-              return {
-                id: player.id,
-                name: player.name,
-                lat: position.lat,
-                lng: position.lng,
-                accuracyM: position.accuracyM ?? 10,
-                seenAt: lastPingAgo,
-              };
-            })
-            .filter((signal): signal is RunnerSignal => Boolean(signal)),
+            .filter((player) => player.position)
+            .map((player) => ({
+              id: player.id,
+              name: player.name,
+              lat: player.position!.lat,
+              lng: player.position!.lng,
+              accuracyM: player.position!.accuracyM,
+              seenAt: lastPingAgo,
+            })),
     [activeRunners, lastPingAgo, pingWindowOpen],
   );
 
@@ -143,13 +154,16 @@ export function HunterPage() {
     <div className="relative flex h-dvh flex-col overflow-hidden bg-canvas lg:flex-row">
       <div className="relative min-h-0 flex-1">
         <HunterMap
+          self={self}
           hunters={hunters}
           runners={signals}
+          center={center}
           playAreaM={settings.playAreaM}
           pingKey={pingCount}
         />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(4,9,10,0.62),transparent_30%,transparent_70%,rgba(4,9,10,0.3))]" />
         <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/5" />
+        <GpsBanner className="absolute bottom-4 left-3 z-[405] max-w-[280px] lg:bottom-5 lg:left-5" />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[400] px-3 pt-3 safe-top sm:px-4">
           <div className="pointer-events-auto mx-auto flex max-w-5xl items-start justify-between gap-2">
@@ -157,7 +171,7 @@ export function HunterPage() {
               <RoleBadge role="hunter" compact />
               <div className="hidden sm:block">
                 <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink">
-                  ECHO / FIELD
+                  {you?.name ?? "YOU"} / FIELD
                 </p>
                 <p className="mt-0.5 font-mono text-[7px] uppercase tracking-[0.16em] text-faint">
                   Hunter channel
@@ -166,6 +180,8 @@ export function HunterPage() {
             </div>
 
             <div className="flex items-center gap-1.5">
+              <ZoneStatusChip tone="hunter" />
+
               <div className="flex items-center gap-2 rounded-[3px] border border-line-strong/60 bg-surface/90 px-2.5 py-1.5 shadow-lg backdrop-blur-md">
                 <ProgressRing
                   progress={pingProgress}
@@ -284,8 +300,10 @@ export function HunterPage() {
           </div>
 
           <div className="space-y-2 p-3">
+            <ZonePanel tone="hunter" />
+
             {signals.map((signal) => {
-              const distance = distanceMeters(DEMO_CENTER, signal);
+              const distance = self ? distanceMeters(self, signal) : null;
               return (
                 <div
                   key={signal.id}
@@ -313,7 +331,7 @@ export function HunterPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-mono text-[10px] tabular text-ink">
-                        {formatDistance(distance, units)}
+                        {distance === null ? "—" : formatDistance(distance, units)}
                       </p>
                       <p className="mt-1 font-mono text-[7px] uppercase tracking-[0.14em] text-faint">
                         From you
@@ -387,9 +405,25 @@ export function HunterPage() {
             <div className="hidden pt-2 lg:block">
               <p className="label-mono mb-2">Field log</p>
               <div className="space-y-2">
-                <LogRow time="00:42" text="WREN signal acquired" tone="runner" />
-                <LogRow time="02:18" text="KILO moved 180 m north" tone="hunter" />
-                <LogRow time="04:10" text="Ping cycle complete" tone="neutral" />
+                <LogRow
+                  time={formatClock(Math.max(0, pingCount * settings.pingSec))}
+                  text={
+                    activeRunners[0]
+                      ? `${activeRunners[0].name} signal acquired`
+                      : "No active runner signals"
+                  }
+                  tone="runner"
+                />
+                <LogRow
+                  time={formatClock(Math.max(0, pingCount * settings.pingSec))}
+                  text={`${hunters.length} hunters in the field`}
+                  tone="hunter"
+                />
+                <LogRow
+                  time={formatClock(Math.max(0, pingCount * settings.pingSec))}
+                  text={pingCount > 0 ? "Ping cycle complete" : "Awaiting first ping"}
+                  tone="neutral"
+                />
               </div>
             </div>
           </div>
@@ -471,7 +505,7 @@ export function HunterPage() {
           <MenuRow
             icon={RefreshCcw}
             title="Replay ping"
-            description="Trigger a mock location ping"
+            description="Broadcast runner positions now"
             onClick={() => {
               useGame.getState().triggerPing();
               setMenuOpen(false);
@@ -498,6 +532,15 @@ export function HunterPage() {
           <RuleRow label="Round duration" value={formatLongClock(settings.durationSec)} />
           <RuleRow label="Play area" value={`${formatRadius(settings.playAreaM, units)} radius`} />
           <RuleRow
+            label="Shrinking zone"
+            value={
+              zone.enabled
+                ? `On · −${zone.shrinkStepM} m / ${Math.round(zone.intervalSec / 60)} min`
+                : "Off"
+            }
+            accent={zone.enabled ? "runner" : undefined}
+          />
+          <RuleRow
             label="Hunter tracking"
             value={settings.showHunterTeammates ? "Visible" : "Hidden"}
           />
@@ -511,9 +554,11 @@ export function HunterPage() {
           />
         </div>
         <p className="mt-4 border-t border-line pt-3 font-mono text-[8px] uppercase leading-relaxed tracking-[0.12em] text-faint">
-          Runners never receive hunter names. When intel is enabled, runners
-          see anonymous hunter markers with bearing and distance only.
+          Hunter markers are anonymous. When intel is enabled, runners see
+          bearing and distance to nearby hunters, never a live position unless
+          the host has enabled all-hunter intel.
         </p>
+        <ZoneRuleNote tone="hunter" />
       </Modal>
 
       <TagSheet open={tagOpen} onClose={() => setTagOpen(false)} tagCode={tagCode} onTagCodeChange={setTagCode} onSubmit={submitTag} />

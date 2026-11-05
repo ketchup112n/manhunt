@@ -5,30 +5,37 @@ import { TopBar } from "@/components/layout/TopBar";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { useGame, useYou } from "@/store/game";
-
-const DEMO_CODE = "VX7K2M";
+import { useGame } from "@/store/game";
 
 export function JoinPage() {
   const navigate = useNavigate();
   const { code: routeCode } = useParams();
-  const you = useYou();
-  const setYouName = useGame((s) => s.setYouName);
+  const draftName = useGame((state) => state.draftName);
+  const setDraftName = useGame((state) => state.setDraftName);
+  const joinLobby = useGame((state) => state.joinLobby);
   const [code, setCode] = useState(routeCode?.toUpperCase() ?? "");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (code.length !== 6) {
       setError("Enter the full 6-character lobby code.");
       return;
     }
-    if (!you?.name.trim()) {
+    if (!draftName.trim()) {
       setError("Add a display name before entering.");
       return;
     }
     setError("");
-    navigate(`/lobby/${code}`);
+    setBusy(true);
+    const result = await joinLobby(code, draftName);
+    setBusy(false);
+    if (result.ok && result.code) {
+      navigate(`/lobby/${result.code}`);
+    } else {
+      setError(result.error ?? "Could not join the lobby.");
+    }
   };
 
   return (
@@ -96,9 +103,9 @@ export function JoinPage() {
                   </label>
                   <input
                     id="display-name"
-                    value={you?.name ?? ""}
+                    value={draftName}
                     onChange={(event) => {
-                      setYouName(event.target.value);
+                      setDraftName(event.target.value);
                       setError("");
                     }}
                     maxLength={12}
@@ -106,7 +113,6 @@ export function JoinPage() {
                     placeholder="YOUR NAME"
                   />
                 </div>
-
               </div>
 
               {error ? (
@@ -121,8 +127,9 @@ export function JoinPage() {
                 size="lg"
                 full
                 className="mt-5"
+                disabled={busy}
               >
-                Join lobby
+                {busy ? "Connecting..." : "Join lobby"}
                 <ArrowRight className="size-4" />
               </Button>
 
@@ -130,16 +137,9 @@ export function JoinPage() {
                 <p className="font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
                   Invite-only / no account required
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCode(DEMO_CODE);
-                    setError("");
-                  }}
-                  className="font-mono text-[8px] uppercase tracking-[0.14em] text-runner transition-opacity hover:opacity-70"
-                >
-                  Use demo code
-                </button>
+                <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-runner">
+                  Live lobby
+                </span>
               </div>
             </form>
           </div>
@@ -182,8 +182,8 @@ export function JoinPage() {
 
               <div className="divide-y divide-line/80">
                 <SignalRow label="Game" value="MANHUNT" />
-                <SignalRow label="Players" value="07 / 20" icon={<Users className="size-3" />} />
-                <SignalRow label="Protocol" value="CLASSIC / 60 MIN" />
+                <SignalRow label="Players" value="LIVE" icon={<Users className="size-3" />} />
+                <SignalRow label="Transport" value="REALTIME / WS" />
               </div>
 
               <div className="border-t border-line bg-surface-2/40 px-5 py-4">
@@ -191,7 +191,7 @@ export function JoinPage() {
                   <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-runner" />
                   <p className="text-[10px] leading-relaxed text-muted">
                     Your location is only shared with players inside the active
-                    lobby. Nothing is collected in this prototype.
+                    lobby. Runner PINs are validated by the server.
                   </p>
                 </div>
               </div>

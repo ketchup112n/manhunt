@@ -39,8 +39,8 @@ export function SettingsPage() {
   const resetAll = () => {
     useGame.getState().resetGame();
     usePreferences.getState().resetPreferences();
-    toast("Prototype state reset", {
-      description: "Game data and preferences restored to defaults.",
+    toast("Session reset", {
+      description: "Left the lobby and restored default preferences.",
       tone: "success",
     });
   };
@@ -117,7 +117,7 @@ export function SettingsPage() {
             <SettingSection
               icon={Volume2}
               title="Feedback"
-              description="In-game cues are simulated in this prototype."
+              description="In-game cues are simulated in this build."
             >
               <div className="divide-y divide-line/70">
                 <Toggle
@@ -146,7 +146,7 @@ export function SettingsPage() {
             <SettingSection
               icon={Smartphone}
               title="Sensors"
-              description="Real permissions will be requested in the functional build."
+              description="Location is requested when the round starts. Other sensors are not wired up yet."
             >
               <div className="space-y-2">
                 <PermissionLine icon={MapPin} label="Precise location" />
@@ -157,8 +157,9 @@ export function SettingsPage() {
               <div className="mt-3 flex items-start gap-2 rounded-[3px] border border-info/20 bg-info/5 px-3 py-2.5">
                 <Info className="mt-0.5 size-3.5 shrink-0 text-info" />
                 <p className="text-[10px] leading-relaxed text-muted">
-                  iOS requires a tap to enable compass access. This UI prototype
-                  simulates sensor values and never requests permissions.
+                  iOS requires a tap to enable compass access. This build uses
+                  real device location for the field map; compass values are
+                  still simulated.
                 </p>
               </div>
             </SettingSection>
@@ -171,18 +172,19 @@ export function SettingsPage() {
               </span>
               <div>
                 <h2 className="font-display text-lg font-semibold uppercase tracking-[0.04em] text-ink">
-                  Prototype data
+                  Session data
                 </h2>
                 <p className="mt-1 text-[11px] text-muted">
-                  This build stores only display preferences and mock game state
-                  in your browser.
+                  Preferences stay in this browser. Lobby state lives on the
+                  server, and your session token is stored locally so a reload
+                  reconnects you.
                 </p>
               </div>
             </div>
             <div className="grid gap-2 p-5 sm:grid-cols-2">
               <Button variant="secondary" onClick={resetAll}>
                 <RotateCcw className="size-3.5" />
-                Reset demo state
+                Leave lobby and reset
               </Button>
               <Button
                 variant="danger"
@@ -200,10 +202,10 @@ export function SettingsPage() {
           <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-line bg-surface/40 px-5 py-4 text-center sm:flex-row sm:text-left">
             <div>
               <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-faint">
-                Manhunt / UI prototype
+                Manhunt / realtime lobby
               </p>
               <p className="mt-1 text-[11px] text-muted">
-                Front-end only · mock players · simulated sensors
+                WebSocket lobby · server timers · simulated locations
               </p>
             </div>
             <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
