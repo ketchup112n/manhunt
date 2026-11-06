@@ -45,7 +45,7 @@ export function createPlayerMarkerIcon(
   const headingMarkup =
     degrees === null
       ? ""
-      : `<span class="player-marker__heading" style="transform: translateX(-50%) rotate(${degrees.toFixed(1)}deg)" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 2.5 19 21l-7-4.4L5 21z"/></svg></span>`;
+      : `<span class="player-marker__heading" style="--heading: ${degrees.toFixed(1)}deg" aria-hidden="true"><svg viewBox="0 0 12 12" focusable="false"><path d="M6 0 11 11 6 8.2 1 11z"/></svg></span>`;
 
   return L.divIcon({
     className: "manhunt-player-marker",

@@ -146,7 +146,7 @@ Make sure the platform forwards WebSocket upgrades to the same port.
 
 ### Runner map and catch markers
 
-Runners get a live field map instead of a compass. The self marker carries a small arrow showing the direction the phone is facing, sourced from the device orientation sensor. iOS requires a tap on **Enable facing** before the sensor can be read; other platforms start listening automatically where the browser allows it.
+Runners get a live field map instead of a compass. The self marker on both the runner and hunter maps carries a small arrow on the rim of the avatar showing the direction the phone is facing, sourced from the device orientation sensor. iOS requires a tap on **Enable facing** before the sensor can be read; other platforms start listening automatically where the browser allows it.
 
 Caught runners keep streaming their own GPS so their spectator map still tracks them, but the server hides that position from everyone else. The spot where each runner was tagged stays on every viewer's map for the rest of the round, even if the player keeps moving.
 

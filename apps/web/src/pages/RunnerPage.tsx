@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Clock3,
   Crosshair,
-  Eye,
   Flag,
   HeartPulse,
   LogOut,
@@ -29,7 +28,6 @@ import { Modal } from "@/components/ui/Modal";
 import { Sheet } from "@/components/ui/Sheet";
 import { useToast } from "@/components/ui/Toast";
 import {
-  formatAgo,
   formatClock,
   formatLongClock,
   formatRadius,
@@ -176,24 +174,12 @@ export function RunnerPage() {
 
         <GpsBanner className="mt-3" />
 
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <StatTile
             icon={Radar}
             label="Next ping"
             value={formatClock(nextPingSec)}
             tone={nextPingSec < 60 ? "warning" : "runner"}
-          />
-          <StatTile
-            icon={Eye}
-            label="Last ping"
-            value={
-              pingCount === 0
-                ? "None yet"
-                : recentlyLocated
-                  ? `${lastPingAgo}s ago`
-                  : formatAgo(lastPingAgo)
-            }
-            tone={recentlyLocated ? "warning" : "neutral"}
           />
           <StatTile icon={Crosshair} label="Hunters" value={String(hunters.length)} tone="hunter" />
           <StatTile
@@ -295,7 +281,6 @@ export function RunnerPage() {
               pingProgress={pingProgress}
               pingSec={settings.pingSec}
               recentlyLocated={recentlyLocated}
-              hasPinged={pingCount > 0}
             />
 
             <Card className="p-4">
@@ -528,14 +513,12 @@ function ExposureCard({
   pingProgress,
   pingSec,
   recentlyLocated,
-  hasPinged,
 }: {
   nextPingSec: number;
   lastPingAgo: number;
   pingProgress: number;
   pingSec: number;
   recentlyLocated: boolean;
-  hasPinged: boolean;
 }) {
   return (
     <Card
@@ -580,14 +563,6 @@ function ExposureCard({
           coordinates for ten seconds. Your position is hidden again until
           the next ping.
         </p>
-        <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
-          <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
-            Last ping
-          </span>
-          <span className="font-mono text-[9px] tabular text-ink">
-            {hasPinged ? formatAgo(lastPingAgo) : "No ping yet"}
-          </span>
-        </div>
       </div>
     </Card>
   );

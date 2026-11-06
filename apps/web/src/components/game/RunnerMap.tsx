@@ -183,24 +183,10 @@ export function RunnerMap({
             />
           ))}
           {self ? (
-            <>
-              <Circle
-                center={[self.lat, self.lng]}
-                radius={Math.max(4, self.accuracyM)}
-                pathOptions={{
-                  color: boundary,
-                  weight: 1,
-                  opacity: 0.35,
-                  fillColor: boundary,
-                  fillOpacity: 0.08,
-                  interactive: false,
-                }}
-              />
-              <Marker
-                position={[self.lat, self.lng]}
-                icon={createPlayerMarkerIcon("self", "YOU", { heading })}
-              />
-            </>
+            <Marker
+              position={[self.lat, self.lng]}
+              icon={createPlayerMarkerIcon("self", "YOU", { heading })}
+            />
           ) : null}
           {hunters.map((hunter) => (
             <Marker

@@ -76,6 +76,7 @@ export function HunterMap({
   center,
   playAreaM,
   pingKey,
+  heading,
 }: {
   self: { id: string; name: string; lat: number; lng: number; accuracyM: number } | null;
   hunters: Player[];
@@ -84,6 +85,7 @@ export function HunterMap({
   center: LatLng | null;
   playAreaM: number;
   pingKey: number;
+  heading?: number | null;
 }) {
   const theme = usePreferences((state) => state.theme);
   const zone = useZoneState();
@@ -156,26 +158,12 @@ export function HunterMap({
             zIndexOffset={-200}
           />
         ))}
-        {self ? (
-          <>
-            <Circle
-              center={[self.lat, self.lng]}
-              radius={Math.max(4, self.accuracyM)}
-              pathOptions={{
-                color: boundary,
-                weight: 1,
-                opacity: 0.35,
-                fillColor: boundary,
-                fillOpacity: 0.08,
-                interactive: false,
-              }}
-            />
+          {self ? (
             <Marker
               position={[self.lat, self.lng]}
-              icon={createPlayerMarkerIcon("self", self.name)}
+              icon={createPlayerMarkerIcon("self", self.name, { heading })}
             />
-          </>
-        ) : null}
+          ) : null}
         {teammates.map((hunter) => (
           <Marker
             key={hunter.id}

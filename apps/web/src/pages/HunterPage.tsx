@@ -11,6 +11,7 @@ import {
   HeartPulse,
   LogOut,
   Menu,
+  Navigation,
   Radar,
   RefreshCcw,
   Shield,
@@ -38,6 +39,7 @@ import {
   formatRadius,
 } from "@/lib/geo";
 import { useGame, useYou, useZoneState } from "@/store/game";
+import { useDeviceHeading } from "@/lib/useDeviceHeading";
 import { usePreferences } from "@/store/preferences";
 import type { RunnerSignal } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -58,8 +60,10 @@ export function HunterPage() {
   const center = useGame((state) => state.center);
   const livePosition = useGame((state) => state.livePosition);
   const caughtSpots = useGame((state) => state.caughtSpots);
+  const deviceHeading = useGame((state) => state.deviceHeading);
   const zone = useZoneState();
   const you = useYou();
+  const { status: headingStatus, enable: enableHeading } = useDeviceHeading();
   const [menuOpen, setMenuOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [tagOpen, setTagOpen] = useState(false);
@@ -140,6 +144,12 @@ export function HunterPage() {
 
   const pingProgress = settings.pingSec === 0 ? 1 : nextPingSec / settings.pingSec;
   const allCaught = activeRunners.length === 0;
+  const facingHeading =
+    headingStatus === "live"
+      ? deviceHeading
+      : import.meta.env.DEV
+        ? deviceHeading
+        : undefined;
 
   const openTag = () => {
     setTagCode("");
@@ -162,6 +172,7 @@ export function HunterPage() {
           center={center}
           playAreaM={settings.playAreaM}
           pingKey={pingCount}
+          heading={facingHeading}
         />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(4,9,10,0.62),transparent_30%,transparent_70%,rgba(4,9,10,0.3))]" />
         <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/5" />
@@ -225,6 +236,26 @@ export function HunterPage() {
               </button>
             </div>
           </div>
+
+          {headingStatus === "needs-permission" ||
+          headingStatus === "denied" ||
+          headingStatus === "pending" ? (
+            <div className="pointer-events-auto mx-auto mt-1.5 flex max-w-5xl">
+              <button
+                type="button"
+                onClick={() => void enableHeading()}
+                disabled={headingStatus === "pending"}
+                className="flex items-center gap-1.5 rounded-[3px] border border-line-strong/60 bg-surface/90 px-2.5 py-1.5 font-mono text-[8px] uppercase tracking-[0.12em] text-muted shadow-lg backdrop-blur-md transition-colors hover:border-hunter/40 hover:text-hunter disabled:cursor-wait disabled:opacity-60"
+              >
+                <Navigation className="size-3" />
+                {headingStatus === "pending"
+                  ? "Enabling"
+                  : headingStatus === "denied"
+                    ? "Retry facing"
+                    : "Enable facing"}
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <AnimatePresence>
@@ -254,12 +285,6 @@ export function HunterPage() {
             <Legend tone="hunter" label="Hunter" />
             <Legend tone="self" label="You" />
             <Legend tone="caught" label="Caught site" />
-          </div>
-          <div className="rounded-[2px] border border-line-strong/50 bg-surface/85 px-2.5 py-2 text-center backdrop-blur-md">
-            <p className="font-mono text-[7px] uppercase tracking-[0.16em] text-faint">Last ping</p>
-            <p className="mt-1 font-mono text-[9px] tabular text-ink">
-              {pingCount === 0 ? "No ping yet" : formatAgo(lastPingAgo)}
-            </p>
           </div>
         </div>
       </div>
