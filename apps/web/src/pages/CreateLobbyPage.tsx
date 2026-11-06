@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, LockKeyhole, ShieldCheck } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
@@ -20,9 +20,19 @@ export function CreateLobbyPage() {
   const createLobby = useGame((s) => s.createLobby);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const create = async () => {
     if (busy) return;
+    if (!draftName.trim()) {
+      setError("Add a display name first.");
+      nameInputRef.current?.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
+      nameInputRef.current?.focus({ preventScroll: true });
+      return;
+    }
     setError("");
     setBusy(true);
     const result = await createLobby(draftName, settings);
@@ -38,7 +48,7 @@ export function CreateLobbyPage() {
     <div className="flex min-h-dvh flex-col">
       <TopBar backTo="/" backLabel="Home" />
 
-      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-16 sm:px-6">
+      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-32 sm:px-6 lg:pb-16">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line py-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <div className="mb-1 flex items-center gap-2">
@@ -62,11 +72,23 @@ export function CreateLobbyPage() {
                 Host
               </span>
               <input
+                ref={nameInputRef}
                 id="display-name"
                 value={draftName}
-                onChange={(event) => setDraftName(event.target.value)}
+                onChange={(event) => {
+                  setDraftName(event.target.value);
+                  if (error) setError("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void create();
+                  }
+                }}
                 placeholder="YOUR NAME"
                 maxLength={12}
+                autoComplete="nickname"
+                enterKeyHint="go"
                 className="h-9 w-full max-w-[220px] rounded-[3px] border border-line bg-canvas/40 px-3 font-mono text-xs uppercase tracking-[0.08em] text-ink outline-none transition-colors placeholder:text-faint/60 focus:border-runner/60"
               />
               <Chip tone="hunter" className="ml-auto">
@@ -149,13 +171,22 @@ export function CreateLobbyPage() {
           </aside>
         </div>
 
-        {/* Mobile sticky create button */}
-        <div className="lg:hidden sticky bottom-0 z-50 bg-gradient-to-t from-canvas via-canvas/95 to-transparent py-4">
+        {/* Mobile create bar stays pinned above the browser chrome and keyboard. */}
+        <div className="safe-bottom fixed inset-x-0 bottom-0 z-50 border-t border-line bg-canvas/95 px-4 pt-3 backdrop-blur-md lg:hidden">
+          {error ? (
+            <p
+              role="alert"
+              aria-live="polite"
+              className="mb-2 text-center font-mono text-[9px] uppercase tracking-[0.12em] text-danger"
+            >
+              {error}
+            </p>
+          ) : null}
           <Button
             variant="hunter"
             size="lg"
             full
-            className="mx-4 max-w-6xl"
+            className="mx-auto max-w-6xl"
             onClick={() => void create()}
             disabled={busy}
           >
