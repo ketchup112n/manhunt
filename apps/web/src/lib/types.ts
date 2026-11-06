@@ -57,6 +57,14 @@ export interface LatLng {
   lng: number;
 }
 
+/** Where a runner was tagged. Historical, and never moves after the catch. */
+export interface CaughtSpot extends LatLng {
+  id: string;
+  name: string;
+  accuracyM: number;
+  at: number;
+}
+
 export interface RunnerSignal extends LatLng {
   id: string;
   name: string;
@@ -95,6 +103,7 @@ export interface Snapshot {
   resultWinner: Winner | null;
   center: LatLng | null;
   nearestHunter: { bearing: number; distanceM: number; updatedAt: number } | null;
+  caughtSpots: CaughtSpot[];
 }
 
 export type TagResult =

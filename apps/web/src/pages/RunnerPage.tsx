@@ -5,22 +5,22 @@ import {
   AlertTriangle,
   ChevronRight,
   Clock3,
-  Compass,
   Crosshair,
   Eye,
   Flag,
   HeartPulse,
   LogOut,
   Menu,
+  Navigation,
   Radar,
   RefreshCcw,
   Shield,
   Sun,
 } from "lucide-react";
-import { CompassDial } from "@/components/game/CompassDial";
 import { EndMatchModal } from "@/components/game/EndMatchModal";
 import { GpsBanner } from "@/components/game/GpsBanner";
 import { RunnerMap } from "@/components/game/RunnerMap";
+import { useFieldMapData } from "@/components/game/useFieldMapData";
 import { ZonePanel, ZoneRuleNote, ZoneStatusChip } from "@/components/game/ZoneHud";
 import { RoleBadge } from "@/components/hud/RoleBadge";
 import { Card } from "@/components/ui/Card";
@@ -31,13 +31,10 @@ import { useToast } from "@/components/ui/Toast";
 import {
   formatAgo,
   formatClock,
-  formatDistance,
   formatLongClock,
   formatRadius,
-  nearestHunter,
-  toPositionedPlayer,
-  type PositionedPlayer,
 } from "@/lib/geo";
+import { useDeviceHeading } from "@/lib/useDeviceHeading";
 import { useGame, useYou, useZoneState } from "@/store/game";
 import { usePreferences } from "@/store/preferences";
 import { cn } from "@/lib/cn";
@@ -55,13 +52,11 @@ export function RunnerPage() {
   const pingExpiresAt = useGame((state) => state.pingExpiresAt);
   const deviceHeading = useGame((state) => state.deviceHeading);
   const phase = useGame((state) => state.phase);
-  const center = useGame((state) => state.center);
-  const livePosition = useGame((state) => state.livePosition);
-  const snapshotNearest = useGame((state) => state.nearestHunter);
   const zone = useZoneState();
   const units = usePreferences((state) => state.units);
-  const northUp = usePreferences((state) => state.northUp);
-  const setPreference = usePreferences((state) => state.setPreference);
+  const { self, teammates, hunters: visibleHunters, caughtSpots, center } =
+    useFieldMapData();
+  const { status: headingStatus, enable: enableHeading } = useDeviceHeading();
   const [menuOpen, setMenuOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [flash, setFlash] = useState(false);
@@ -74,39 +69,14 @@ export function RunnerPage() {
     (player) => player.role === "runner" && player.status === "active",
   );
 
-  const self = toPositionedPlayer({
-    id: you?.id ?? "",
-    name: you?.name ?? "YOU",
-    position: livePosition ?? you?.position,
-  });
-
-  const teammatePositions = activeRunners
-    .filter((player) => player.id !== you?.id)
-    .map(toPositionedPlayer)
-    .filter((player): player is PositionedPlayer => player !== null);
-
-  const visibleHunters = settings.showAllHuntersToRunners
-    ? hunters
-        .map(toPositionedPlayer)
-        .filter((hunter): hunter is PositionedPlayer => hunter !== null)
-    : [];
-
-  // The server computes the nearest hunter for runners without full intel; with
-  // intel enabled the client can work it out from the markers it already has.
-  const nearestInfo =
-    self && visibleHunters.length > 0
-      ? nearestHunter(self, visibleHunters)
-      : snapshotNearest;
-
-  const nearest = {
-    bearing: nearestInfo?.bearing ?? 0,
-    distanceM: nearestInfo?.distanceM ?? null,
-  };
-
-  const distanceLabel =
-    nearest.distanceM === null ? "No intel" : formatDistance(nearest.distanceM, units);
   const pingProgress = settings.pingSec === 0 ? 0 : nextPingSec / settings.pingSec;
   const recentlyLocated = pingWindowOpen && pingCount > 0;
+  const facingHeading =
+    headingStatus === "live"
+      ? deviceHeading
+      : import.meta.env.DEV
+        ? deviceHeading
+        : undefined;
 
   useEffect(() => {
     if (!pingExpiresAt) return;
@@ -236,63 +206,84 @@ export function RunnerPage() {
 
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_350px] lg:items-start">
           <Card corners className="overflow-hidden">
-            <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
               <div>
-                <p className="label-mono mb-1">Proximity tracker</p>
+                <p className="label-mono mb-1">Live positions</p>
                 <h1 className="font-display text-xl font-semibold uppercase leading-none tracking-[0.03em] text-ink">
-                  Compass lock
+                  Field map
                 </h1>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Chip tone={recentlyLocated ? "warning" : "runner"} dot>
                   {recentlyLocated ? "Exposed" : "Tracking"}
                 </Chip>
-                <Chip className="hidden sm:inline-flex">Live GPS</Chip>
+                <Chip
+                  tone={settings.showAllHuntersToRunners ? "hunter" : "runner"}
+                >
+                  {settings.showAllHuntersToRunners
+                    ? `${hunters.length} hunters visible`
+                    : "Squad view"}
+                </Chip>
+                {headingStatus === "needs-permission" ||
+                headingStatus === "denied" ||
+                headingStatus === "pending" ? (
+                  <button
+                    type="button"
+                    onClick={() => void enableHeading()}
+                    disabled={headingStatus === "pending"}
+                    className="flex items-center gap-1.5 rounded-[2px] border border-line-strong bg-surface-2 px-2.5 py-1.5 font-mono text-[8px] uppercase tracking-[0.12em] text-muted transition-colors hover:border-runner/40 hover:text-runner disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <Navigation className="size-3" />
+                    {headingStatus === "pending"
+                      ? "Enabling"
+                      : headingStatus === "denied"
+                        ? "Retry facing"
+                        : "Enable facing"}
+                  </button>
+                ) : null}
               </div>
             </div>
 
-            <div className="relative overflow-hidden px-3 py-6 sm:px-8 sm:py-8">
-              <div className="pointer-events-none absolute left-1/2 top-1/2 size-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-runner/5" />
-              <div className="relative mx-auto max-w-[500px]">
-                <CompassDial
-                  bearing={nearest.bearing}
-                  heading={deviceHeading}
-                  northUp={northUp}
-                  distanceLabel={distanceLabel}
-                  accuracyM={self?.accuracyM ?? 0}
-                  pingRemainingSec={nextPingSec}
-                  pingTotalSec={settings.pingSec}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 divide-x divide-line border-t border-line">
-              <DialStat label="Bearing" value={`${String(Math.round(nearest.bearing)).padStart(3, "0")}°`} />
-              <DialStat label="Nearest" value={distanceLabel} tone="runner" />
-              <DialStat
-                label="Accuracy"
-                value={self ? `±${Math.round(self.accuracyM)} m` : "No fix"}
+            <div className="p-3">
+              <RunnerMap
+                self={self}
+                teammates={teammates}
+                hunters={visibleHunters}
+                caughtSpots={caughtSpots}
+                center={center}
+                playAreaM={settings.playAreaM}
+                heading={facingHeading}
+                heightClass="h-[400px] sm:h-[500px] lg:h-[560px]"
               />
             </div>
 
-            <div className="flex flex-col gap-2 border-t border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2 font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
-                <Compass className="size-3" />
-                {northUp ? "Map north-up" : "Relative to phone"}
-              </div>
-              <div className="flex items-center justify-between gap-3 sm:justify-end">
-                <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
-                  Hold phone flat
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line px-4 py-2.5 font-mono text-[7px] uppercase tracking-[0.12em] text-faint">
+              <span className="flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-runner" />
+                You / facing arrow
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-runner/50" />
+                Squad
+              </span>
+              {settings.showAllHuntersToRunners ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-hunter" />
+                  Hunters
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setPreference("northUp", !northUp)}
-                  className="rounded-[2px] border border-line-strong bg-surface-2 px-2.5 py-1.5 font-mono text-[8px] uppercase tracking-[0.14em] text-muted transition-colors hover:border-runner/40 hover:text-runner"
-                >
-                  {northUp ? "Phone-up" : "North-up"}
-                </button>
-              </div>
+              ) : null}
+              <span className="flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-danger" />
+                Caught site
+              </span>
             </div>
+
+            {!settings.showAllHuntersToRunners ? (
+              <p className="border-t border-line px-4 py-2.5 font-mono text-[7px] uppercase leading-relaxed tracking-[0.12em] text-faint">
+                Only your squad and caught sites are marked. Enable all-hunter
+                intel in lobby rules to reveal anonymous hunter markers.
+              </p>
+            ) : null}
           </Card>
 
           <aside className="space-y-3">
@@ -306,37 +297,6 @@ export function RunnerPage() {
               recentlyLocated={recentlyLocated}
               hasPinged={pingCount > 0}
             />
-
-            <Card corners className="overflow-hidden p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="label-mono">Squad field map</p>
-                  <p className="mt-1 text-[10px] text-muted">
-                    {settings.showAllHuntersToRunners
-                      ? "Your squad and all hunters"
-                      : "Your squad only · hunter intel hidden"}
-                  </p>
-                </div>
-                <Chip tone={settings.showAllHuntersToRunners ? "hunter" : "runner"}>
-                  {settings.showAllHuntersToRunners ? `${hunters.length} hunters` : "Squad view"}
-                </Chip>
-              </div>
-              <div className="mt-3">
-                <RunnerMap
-                  self={self}
-                  teammates={teammatePositions}
-                  hunters={visibleHunters}
-                  center={center}
-                  playAreaM={settings.playAreaM}
-                  pingKey={pingCount}
-                />
-              </div>
-              {!settings.showAllHuntersToRunners ? (
-                <p className="mt-3 border-t border-line pt-3 font-mono text-[7px] uppercase leading-relaxed tracking-[0.12em] text-faint">
-                  Only your teammates are marked here. Enable all-hunter intel in lobby rules to reveal anonymous hunter markers.
-                </p>
-              ) : null}
-            </Card>
 
             <Card className="p-4">
               <p className="label-mono mb-3">Your PIN</p>
@@ -506,13 +466,12 @@ export function RunnerPage() {
           />
           <RuleRow
             label="All-hunter intel"
-            value={settings.showAllHuntersToRunners ? "Enabled (map + list)" : "Disabled (nearest only)"}
+            value={settings.showAllHuntersToRunners ? "Enabled (map + list)" : "Disabled (squad only)"}
           />
         </div>
         <p className="mt-4 border-t border-line pt-3 font-mono text-[8px] uppercase leading-relaxed tracking-[0.12em] text-faint">
-          Compass bearings point to the nearest hunter. When all-hunter intel
-          is enabled, runners see anonymous hunter markers with bearing and
-          distance.
+          The map shows your squad and caught sites. When all-hunter intel is
+          enabled, anonymous hunter markers also appear with their distance.
         </p>
         <ZoneRuleNote tone="runner" />
       </Modal>
@@ -559,30 +518,6 @@ function StatTile({
           {value}
         </p>
       </div>
-    </div>
-  );
-}
-
-function DialStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "runner";
-}) {
-  return (
-    <div className="px-3 py-3 text-center">
-      <p className="font-mono text-[7px] uppercase tracking-[0.16em] text-faint">{label}</p>
-      <p
-        className={cn(
-          "mt-1 font-mono text-sm tabular",
-          tone === "runner" ? "text-runner" : "text-ink",
-        )}
-      >
-        {value}
-      </p>
     </div>
   );
 }

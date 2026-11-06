@@ -4,7 +4,7 @@ import { LocateFixed, Minus, Plus } from "lucide-react";
 import { createPlayerMarkerIcon } from "@/components/game/playerMarker";
 import { usePreferences } from "@/store/preferences";
 import { useZoneState } from "@/store/game";
-import type { LatLng, Player, RunnerSignal } from "@/lib/types";
+import type { CaughtSpot, LatLng, Player, RunnerSignal } from "@/lib/types";
 
 function MapControls({ home }: { home: LatLng }) {
   const map = useMap();
@@ -72,6 +72,7 @@ export function HunterMap({
   self,
   hunters,
   runners,
+  caughtSpots,
   center,
   playAreaM,
   pingKey,
@@ -79,6 +80,7 @@ export function HunterMap({
   self: { id: string; name: string; lat: number; lng: number; accuracyM: number } | null;
   hunters: Player[];
   runners: RunnerSignal[];
+  caughtSpots: CaughtSpot[];
   center: LatLng | null;
   playAreaM: number;
   pingKey: number;
@@ -146,6 +148,14 @@ export function HunterMap({
             }}
           />
         ) : null}
+        {caughtSpots.map((spot) => (
+          <Marker
+            key={`caught-${spot.id}`}
+            position={[spot.lat, spot.lng]}
+            icon={createPlayerMarkerIcon("caught", spot.name)}
+            zIndexOffset={-200}
+          />
+        ))}
         {self ? (
           <>
             <Circle
@@ -177,7 +187,7 @@ export function HunterMap({
           <Marker
             key={`${runner.id}-${pingKey}`}
             position={[runner.lat, runner.lng]}
-            icon={createPlayerMarkerIcon("runner", runner.name, true)}
+            icon={createPlayerMarkerIcon("runner", runner.name, { ping: true })}
           />
         ))}
         <MapControls home={focus} />

@@ -1,8 +1,8 @@
 # MANHUNT
 
-A mobile-first, realtime lobby for a real-world manhunt game. Hosts create a lobby, share a six-character code, assign players to teams, and deploy the round. Hunters receive periodic runner location pings and register catches with a runner-only PIN. Runners get a compass, a private tag code, and an optional shrinking play area.
+A mobile-first, realtime lobby for a real-world manhunt game. Hosts create a lobby, share a six-character code, assign players to teams, and deploy the round. Hunters receive periodic runner location pings and register catches with a runner-only PIN. Runners get a live field map with a facing arrow, a private tag code, and an optional shrinking play area.
 
-Lobby state, timers, pings, and PIN validation live on a small WebSocket server, so players on different devices can join the same game. Player positions come from the device GPS while a round is running; compass headings are still simulated.
+Lobby state, timers, pings, and PIN validation live on a small WebSocket server, so players on different devices can join the same game. Player positions come from the device GPS while a round is running; the runner map also uses the device orientation sensor for its facing arrow where available.
 
 ## Quick start
 
@@ -127,8 +127,8 @@ Make sure the platform forwards WebSocket upgrades to the same port.
 | `/join/:code` | Join with a prefilled code |
 | `/lobby/:code` | Host lobby, standby list, team assignment, invite QR, editable settings, prep |
 | `/game/hunter` | Hunter map HUD, ping intel, PIN tag flow |
-| `/game/runner` | Runner compass HUD, exposure status, private PIN, optional hunter map |
-| `/game/spectator` | Spectator field view |
+| `/game/runner` | Runner field map with facing arrow, exposure status, private PIN, optional hunter intel |
+| `/game/spectator` | Spectator field map and round status |
 | `/results` | After-action report |
 | `/settings` | Display, units, sound, haptics, motion |
 | `*` | Not found |
@@ -141,8 +141,14 @@ Make sure the platform forwards WebSocket upgrades to the same port.
 4. The host moves players between **Hunters** and **Runners** with the team buttons or drag-and-drop, or uses **Randomize teams**. Every player must be assigned before the round can start.
 5. The host starts the operation. The server runs the prep countdown, then activates the round. Phones follow the server clock and route each player to the correct screen.
 6. During the round, the server fires pings on schedule. Hunters see last-known runner positions for ten seconds after each ping.
-7. A hunter asks a caught runner for their four-digit PIN and enters it. The server validates the PIN, marks the runner caught, and moves them to spectator mode.
+7. A hunter asks a caught runner for their four-digit PIN and enters it. The server validates the PIN, marks the runner caught, freezes a catch marker at their last fix, and moves them to spectator mode.
 8. The round ends when time expires, every runner is caught, or the host ends it early.
+
+### Runner map and catch markers
+
+Runners get a live field map instead of a compass. The self marker carries a small arrow showing the direction the phone is facing, sourced from the device orientation sensor. iOS requires a tap on **Enable facing** before the sensor can be read; other platforms start listening automatically where the browser allows it.
+
+Caught runners keep streaming their own GPS so their spectator map still tracks them, but the server hides that position from everyone else. The spot where each runner was tagged stays on every viewer's map for the rest of the round, even if the player keeps moving.
 
 ### Dev bots
 
@@ -154,7 +160,8 @@ The dev console (right-edge **Demo** tab, development builds only) can fill the 
 - In development, `npm run dev` sets `MANHUNT_DEV_PINS=true`, so the demo console can show every PIN. The production `start` script leaves the flag off.
 - Session tokens are bearer credentials for the socket; they are not passwords and are only stored locally.
 - Location is requested only while the round is in prep or active. The server never asks for a fix before the host deploys.
-- Visibility is enforced server-side: you always see yourself; hunters see hunter teammates and runners only during a ten-second ping window; runners see their squad and, when the host enables all-hunter intel, anonymous hunter markers. Caught and unassigned players never share a position.
+- Visibility is enforced server-side: you always see yourself; hunters see hunter teammates and runners only during a ten-second ping window; runners see their squad and, when the host enables all-hunter intel, anonymous hunter markers. Unassigned players never share a position.
+- Spectators stay on their own map with their squad and catch markers, but the server never returns their position to other players and they are not counted toward the round result. Caught runners keep a private self-only fix for their spectator map.
 - The arena center is anchored from the host's fix, then the first available fix, then the first fix received during prep or the round.
 - Teams and settings are host-controlled. The server rejects team changes, rule edits, and early endings from other players.
 
@@ -202,7 +209,7 @@ apps/
 ## Current limitations
 
 - **No accounts or persistence.** Lobbies live in server memory and disappear after six idle hours or a server restart. A restart requires players to join again.
-- **GPS requires permission and HTTPS.** The browser geolocation API streams precise fixes to the server during prep and the active round. Denied or unavailable fixes surface as an in-game banner. Device orientation is still simulated.
+- **GPS and facing need permission and HTTPS.** The browser geolocation API streams precise fixes to the server during prep and the active round. Denied or unavailable fixes surface as an in-game banner. The facing arrow needs device orientation access, which iOS only grants after a tap on **Enable facing**.
 - **No pressure testing.** One process, in-memory state, and no rate limiting; suitable for a friend-group game, not a public deployment.
 - **Map tiles require network access.** Leaflet renders OpenStreetMap tiles with a CSS filter for the dark theme.
 - **Basic resilience only.** The client reconnects with backoff, but the host keeps their role while offline and there is no host migration during a round.
@@ -210,7 +217,6 @@ apps/
 
 ## Next steps
 
-- Device orientation permissions and compass calibration
 - Redis-backed rooms or a database for persistence across restarts
 - Authentication, rate limiting, and host migration during a round
 - Production map tile provider and offline/error states

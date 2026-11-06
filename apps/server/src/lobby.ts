@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   DEFAULT_SETTINGS,
+  type CaughtSpot,
   type ClientMessage,
   type GamePhase,
   type GameSettings,
@@ -48,6 +49,8 @@ export interface LobbyPlayer {
   connected: boolean;
   lastSeen: number;
   position: GeoPosition | null;
+  /** Last known location at the moment this runner was tagged. */
+  caughtAt: GeoPosition | null;
 }
 
 export interface ActionResult {
@@ -128,6 +131,7 @@ export class Lobby {
       connected: options.isBot ?? false,
       lastSeen: Date.now(),
       position: null,
+      caughtAt: null,
     };
   }
 
@@ -275,6 +279,7 @@ export class Lobby {
     if (!this.center) this.center = this.anchorFromPlayers();
     for (const player of this.players.values()) {
       player.status = "active";
+      player.caughtAt = null;
       player.ready = true;
     }
   }
@@ -358,6 +363,7 @@ export class Lobby {
         }
         target.role = message.role;
         target.status = "active";
+        target.caughtAt = null;
         return { changed: true };
       }
 
@@ -470,7 +476,9 @@ export class Lobby {
         }
         const target = runners.find((runner) => runner.tagCode === code);
         if (!target) return { changed: false, tag: { result: "invalid" } };
+        const spot = target.position ?? player.position;
         target.status = "caught";
+        target.caughtAt = spot ? { ...spot, at: Date.now() } : null;
         this.pingPositions.delete(target.id);
         return {
           changed: true,
@@ -560,6 +568,7 @@ export class Lobby {
     for (const player of players) {
       player.role = hunterIds.has(player.id) ? "hunter" : "runner";
       player.status = "active";
+      player.caughtAt = null;
     }
   }
 
@@ -668,6 +677,20 @@ export class Lobby {
       }
     }
 
+    const caughtSpots: CaughtSpot[] = started
+      ? [...this.players.values()]
+          .filter((player) => player.status === "caught" && player.caughtAt)
+          .map((player) => ({
+            id: player.id,
+            name: player.name,
+            lat: player.caughtAt!.lat,
+            lng: player.caughtAt!.lng,
+            accuracyM: player.caughtAt!.accuracyM,
+            at: player.caughtAt!.at,
+          }))
+          .sort((a, b) => a.at - b.at)
+      : [];
+
     return {
       code: this.code,
       phase,
@@ -687,6 +710,7 @@ export class Lobby {
       resultWinner: this.resultWinner,
       center: this.center ? { ...this.center } : null,
       nearestHunter,
+      caughtSpots,
     };
   }
 }

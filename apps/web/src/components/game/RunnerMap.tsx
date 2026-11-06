@@ -1,15 +1,12 @@
 import { useEffect, useRef } from "react";
 import { Circle, MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
 import { LocateFixed, Minus, Plus } from "lucide-react";
-import {
-  bearingDegrees,
-  distanceMeters,
-  type PositionedPlayer,
-} from "@/lib/geo";
+import { distanceMeters, type PositionedPlayer } from "@/lib/geo";
 import { createPlayerMarkerIcon } from "@/components/game/playerMarker";
 import { usePreferences } from "@/store/preferences";
 import { useZoneState } from "@/store/game";
-import type { LatLng } from "@/lib/types";
+import { cn } from "@/lib/cn";
+import type { CaughtSpot, LatLng } from "@/lib/types";
 
 function MapControls({ home }: { home: LatLng }) {
   const map = useMap();
@@ -75,16 +72,20 @@ export function RunnerMap({
   self,
   teammates,
   hunters,
+  caughtSpots,
   center,
   playAreaM,
-  pingKey,
+  heading,
+  heightClass = "h-[280px] sm:h-[340px]",
 }: {
   self: PositionedPlayer | null;
   teammates: PositionedPlayer[];
   hunters: PositionedPlayer[];
+  caughtSpots: CaughtSpot[];
   center: LatLng | null;
   playAreaM: number;
-  pingKey: number;
+  heading?: number | null;
+  heightClass?: string;
 }) {
   const theme = usePreferences((state) => state.theme);
   const zone = useZoneState();
@@ -96,7 +97,12 @@ export function RunnerMap({
 
   if (!focus) {
     return (
-      <div className="relative h-[280px] w-full overflow-hidden rounded-[3px] border border-line hud-grid sm:h-[340px]">
+      <div
+        className={cn(
+          "relative w-full overflow-hidden rounded-[3px] border border-line hud-grid",
+          heightClass,
+        )}
+      >
         <WaitingForGps />
       </div>
     );
@@ -107,7 +113,6 @@ export function RunnerMap({
         .map((hunter) => ({
           ...hunter,
           distanceM: distanceMeters(self, hunter),
-          bearing: bearingDegrees(self, hunter),
         }))
         .sort((a, b) => a.distanceM - b.distanceM)
     : [];
@@ -122,7 +127,12 @@ export function RunnerMap({
 
   return (
     <div className="flex min-h-0 w-full flex-col">
-      <div className="relative h-[280px] w-full overflow-hidden rounded-[3px] border border-line sm:h-[340px]">
+      <div
+        className={cn(
+          "relative w-full overflow-hidden rounded-[3px] border border-line",
+          heightClass,
+        )}
+      >
         <MapContainer
           center={[focus.lat, focus.lng]}
           zoom={16}
@@ -164,6 +174,14 @@ export function RunnerMap({
               }}
             />
           ) : null}
+          {caughtSpots.map((spot) => (
+            <Marker
+              key={`caught-${spot.id}`}
+              position={[spot.lat, spot.lng]}
+              icon={createPlayerMarkerIcon("caught", spot.name)}
+              zIndexOffset={-200}
+            />
+          ))}
           {self ? (
             <>
               <Circle
@@ -180,13 +198,13 @@ export function RunnerMap({
               />
               <Marker
                 position={[self.lat, self.lng]}
-                icon={createPlayerMarkerIcon("self", "YOU")}
+                icon={createPlayerMarkerIcon("self", "YOU", { heading })}
               />
             </>
           ) : null}
           {hunters.map((hunter) => (
             <Marker
-              key={`${hunter.id}-${pingKey}`}
+              key={hunter.id}
               position={[hunter.lat, hunter.lng]}
               icon={createPlayerMarkerIcon("hunter", "HUNTER")}
             />
@@ -211,7 +229,7 @@ export function RunnerMap({
                   Hunter {index + 1}
                 </span>
                 <span className="font-mono tabular-nums text-ink">
-                  {Math.round(target.distanceM)}m · {Math.round(target.bearing)}°
+                  {Math.round(target.distanceM)}m
                 </span>
               </div>
             ))}

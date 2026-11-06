@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { useMemo } from "react";
 import {
   DEFAULT_SETTINGS,
+  type CaughtSpot,
   type ClientMessage,
   type GamePhase,
   type GameSettings,
@@ -63,6 +64,7 @@ interface GameStore {
   deviceHeading: number;
   center: LatLng | null;
   nearestHunter: { bearing: number; distanceM: number; updatedAt: number } | null;
+  caughtSpots: CaughtSpot[];
   livePosition: GeoPosition | null;
   positionStatus: PositionStatus;
   positionError: string | null;
@@ -119,6 +121,7 @@ const initialState = {
     distanceM: number;
     updatedAt: number;
   } | null,
+  caughtSpots: [] as CaughtSpot[],
   livePosition: null as GeoPosition | null,
   positionStatus: "idle" as PositionStatus,
   positionError: null as string | null,
@@ -254,6 +257,7 @@ export const useGame = create<GameStore>((set, get) => {
       resultWinner: state.resultWinner,
       center: state.center,
       nearestHunter: state.nearestHunter,
+      caughtSpots: state.caughtSpots,
       connection: "connected",
       connectionError: null,
     });

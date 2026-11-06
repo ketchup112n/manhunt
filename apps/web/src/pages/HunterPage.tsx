@@ -57,6 +57,7 @@ export function HunterPage() {
   const phase = useGame((state) => state.phase);
   const center = useGame((state) => state.center);
   const livePosition = useGame((state) => state.livePosition);
+  const caughtSpots = useGame((state) => state.caughtSpots);
   const zone = useZoneState();
   const you = useYou();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -157,6 +158,7 @@ export function HunterPage() {
           self={self}
           hunters={hunters}
           runners={signals}
+          caughtSpots={caughtSpots}
           center={center}
           playAreaM={settings.playAreaM}
           pingKey={pingCount}
@@ -251,6 +253,7 @@ export function HunterPage() {
             <Legend tone="runner" label="Runner ping" />
             <Legend tone="hunter" label="Hunter" />
             <Legend tone="self" label="You" />
+            <Legend tone="caught" label="Caught site" />
           </div>
           <div className="rounded-[2px] border border-line-strong/50 bg-surface/85 px-2.5 py-2 text-center backdrop-blur-md">
             <p className="font-mono text-[7px] uppercase tracking-[0.16em] text-faint">Last ping</p>
@@ -571,7 +574,7 @@ function Legend({
   tone,
   label,
 }: {
-  tone: "runner" | "hunter" | "self";
+  tone: "runner" | "hunter" | "self" | "caught";
   label: string;
 }) {
   return (
@@ -582,8 +585,10 @@ function Legend({
           tone === "runner"
             ? "bg-runner"
             : tone === "hunter"
-            ? "bg-hunter"
-            : "border border-runner bg-ink",
+              ? "bg-hunter"
+              : tone === "caught"
+                ? "bg-danger"
+                : "border border-runner bg-ink",
         )}
       />
       <span className="font-mono text-[7px] uppercase tracking-[0.14em] text-muted">{label}</span>

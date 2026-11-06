@@ -5,11 +5,13 @@ import {
   Flag,
   Footprints,
   LogOut,
-  MapPinOff,
   Radio,
   ShieldX,
   Timer,
 } from "lucide-react";
+import { GpsBanner } from "@/components/game/GpsBanner";
+import { RunnerMap } from "@/components/game/RunnerMap";
+import { useFieldMapData } from "@/components/game/useFieldMapData";
 import { TopBar } from "@/components/layout/TopBar";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -29,6 +31,8 @@ export function SpectatorPage() {
   const hunters = players.filter((p) => p.role === "hunter").length;
   const survived = Math.max(0, settings.durationSec - timeLeftSec);
   const caught = you?.role === "runner" && you.status === "caught";
+  const { self, teammates, hunters: hunterMarkers, caughtSpots, center } =
+    useFieldMapData();
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -74,8 +78,8 @@ export function SpectatorPage() {
               </h1>
               <p className="mx-auto mt-4 max-w-md text-[13px] leading-relaxed text-muted">
                 {caught
-                  ? "A hunter confirmed your PIN tag. Your name is off the field and your live location is no longer shared."
-                  : "You are observing this round. The host has not assigned you to a side, so no location or intel is shared."}
+                  ? "A hunter confirmed your PIN tag. You're out of the round, but your device stays on your own map while other players can no longer see you."
+                  : "You are observing this round. The host has not assigned you to a side, so no other player's intel is shared."}
               </p>
 
               <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
@@ -105,18 +109,18 @@ export function SpectatorPage() {
               <p className="label-mono mb-3">Field status</p>
               <div className="space-y-3">
                 <StatusRow
-                  icon={MapPinOff}
-                  title="Location sharing stopped"
-                  description="No further coordinates are sent from your phone."
+                  icon={EyeOff}
+                  title="Hidden from other players"
+                  description="Your live position is no longer sent to hunters or runners."
                   tone="runner"
                 />
                 <StatusRow
-                  icon={EyeOff}
-                  title="No live intel"
-                  description="Spectators receive round status only — never player positions."
+                  icon={Radio}
+                  title="Spectator intel active"
+                  description="You still see your squad and caught sites, plus hunter markers when all-hunter intel is enabled."
                 />
                 <StatusRow
-                  icon={Radio}
+                  icon={Footprints}
                   title={`${activeRunners} runner${activeRunners === 1 ? "" : "s"} still active`}
                   description={`${hunters} hunters remain in the field.`}
                   tone="hunter"
@@ -133,6 +137,36 @@ export function SpectatorPage() {
                 <CommsRow time="18:44" text="Round continues without you" tone="neutral" />
               </div>
             </div>
+          </div>
+
+          <div className="border-t border-line p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="label-mono mb-1">Spectator map</p>
+                <p className="text-[10px] text-muted">
+                  You stay on your own map. Other players cannot see you.
+                </p>
+              </div>
+              <Chip tone="runner" dot>
+                Hidden from field
+              </Chip>
+            </div>
+            <GpsBanner className="mt-3" />
+            <div className="mt-3">
+              <RunnerMap
+                self={self}
+                teammates={teammates}
+                hunters={hunterMarkers}
+                caughtSpots={caughtSpots}
+                center={center}
+                playAreaM={settings.playAreaM}
+                heightClass="h-[340px] sm:h-[420px]"
+              />
+            </div>
+            <p className="mt-3 border-t border-line pt-3 font-mono text-[7px] uppercase leading-relaxed tracking-[0.12em] text-faint">
+              Squad and caught sites are visible. Hunter markers appear only when
+              all-hunter intel is enabled.
+            </p>
           </div>
         </div>
 
@@ -154,7 +188,7 @@ export function SpectatorPage() {
         </div>
 
         <p className="mt-5 text-center font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
-          {you?.name ?? "RUNNER"} / spectator channel / no location data
+          {you?.name ?? "RUNNER"} / spectator channel / hidden from field
         </p>
       </main>
     </div>
@@ -195,7 +229,7 @@ function StatusRow({
   description,
   tone,
 }: {
-  icon: typeof MapPinOff;
+  icon: typeof EyeOff;
   title: string;
   description: string;
   tone?: "hunter" | "runner";

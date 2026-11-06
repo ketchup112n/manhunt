@@ -335,3 +335,68 @@ test("all-hunter intel reveals hunter positions and hides the nearest hint", () 
   assert.ok(hostPosition);
   assert.equal(snapshot.nearestHunter, null);
 });
+
+test("a tagged runner leaves a frozen catch marker and keeps a self-only fix", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const runner = [...lobby.players.values()].find(
+    (player) => player.role === "runner",
+  )!;
+
+  movePlayer(lobby, hostId, 40.7, -74);
+  movePlayer(lobby, runner.id, 40.705, -74);
+  lobby.handle(hostId, { type: "start" });
+
+  const tag = lobby.handle(hostId, {
+    type: "submitTag",
+    code: runner.tagCode,
+  });
+  assert.equal(tag.tag?.result, "success");
+
+  const hunterSnapshot = lobby.snapshotFor(hostId, false);
+  assert.equal(
+    hunterSnapshot.players.find((player) => player.id === runner.id)?.position,
+    undefined,
+  );
+  assert.equal(hunterSnapshot.caughtSpots.length, 1);
+  assert.equal(hunterSnapshot.caughtSpots[0].id, runner.id);
+  assert.equal(hunterSnapshot.caughtSpots[0].lat, 40.705);
+
+  const selfSnapshot = lobby.snapshotFor(runner.id, false);
+  assert.equal(
+    selfSnapshot.players.find((player) => player.id === runner.id)?.position
+      ?.lat,
+    40.705,
+  );
+  assert.equal(selfSnapshot.caughtSpots[0].lat, 40.705);
+
+  movePlayer(lobby, runner.id, 40.8, -74);
+  const movedHunterSnapshot = lobby.snapshotFor(hostId, false);
+  assert.equal(movedHunterSnapshot.caughtSpots[0].lat, 40.705);
+  assert.equal(
+    movedHunterSnapshot.players.find((player) => player.id === runner.id)
+      ?.position,
+    undefined,
+  );
+
+  const movedSelfSnapshot = lobby.snapshotFor(runner.id, false);
+  assert.equal(
+    movedSelfSnapshot.players.find((player) => player.id === runner.id)
+      ?.position?.lat,
+    40.8,
+  );
+});
+
+test("a catch marker falls back to the hunter's fix when the runner has none", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const runner = [...lobby.players.values()].find(
+    (player) => player.role === "runner",
+  )!;
+
+  movePlayer(lobby, hostId, 51.5, -0.12);
+  lobby.handle(hostId, { type: "start" });
+  lobby.handle(hostId, { type: "submitTag", code: runner.tagCode });
+
+  const spot = lobby.snapshotFor(hostId, false).caughtSpots[0];
+  assert.equal(spot.lat, 51.5);
+  assert.equal(spot.lng, -0.12);
+});

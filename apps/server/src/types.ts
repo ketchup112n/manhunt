@@ -52,6 +52,14 @@ export interface LatLng {
   lng: number;
 }
 
+/** Where a runner was tagged. Historical, and never moves after the catch. */
+export interface CaughtSpot extends LatLng {
+  id: string;
+  name: string;
+  accuracyM: number;
+  at: number;
+}
+
 /** Player shape sent to clients. PINs are only included for their owner (or dev clients). */
 export interface PublicPlayer {
   id: string;
@@ -86,6 +94,8 @@ export interface Snapshot {
   center: LatLng | null;
   /** Bearing and range to the closest hunter, for runners without hunter intel. */
   nearestHunter: { bearing: number; distanceM: number; updatedAt: number } | null;
+  /** Frozen locations where runners were tagged this round. */
+  caughtSpots: CaughtSpot[];
 }
 
 export interface Session {
