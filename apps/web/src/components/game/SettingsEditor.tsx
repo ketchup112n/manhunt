@@ -146,7 +146,7 @@ export function SettingsEditor({ compact }: { compact?: boolean }) {
         index="02"
         title="Rules of engagement"
         summary={`${formatRadius(settings.playAreaM, units)} field · ${
-          settings.showAllHuntersToRunners ? "all hunters" : "compass only"
+          settings.showAllHuntersToRunners ? "all hunters" : "squad only"
         }`}
         expanded={open.field}
         onToggle={() => toggle("field")}
@@ -501,7 +501,7 @@ export function SettingsSummary({ compact }: { compact?: boolean }) {
       icon: Users,
     },
     { label: "Field", value: formatRadius(settings.playAreaM, units), icon: Map },
-    { label: "Intel", value: settings.showAllHuntersToRunners ? "All hunters" : "Compass only", icon: Crosshair },
+    { label: "Intel", value: settings.showAllHuntersToRunners ? "All hunters" : "Squad only", icon: Crosshair },
     {
       label: "Zone",
       value: settings.zoneEnabled ? "Shrinking" : "Static",
@@ -555,7 +555,7 @@ export function RulesChips() {
       <Chip tone="hunter">Ping {Math.round(settings.pingSec / 60)}m</Chip>
       <Chip>{Math.round(settings.durationSec / 60)}m round</Chip>
       <Chip tone="runner">Private tag code</Chip>
-      <Chip>{settings.showAllHuntersToRunners ? "Hunter map on" : "Hunter map off"}</Chip>
+      <Chip>{settings.showAllHuntersToRunners ? "Hunter intel on" : "Hunter intel off"}</Chip>
       {settings.zoneEnabled ? <Chip tone="warning">Zone shrinking</Chip> : null}
     </div>
   );

@@ -383,7 +383,7 @@ export function LobbyPage() {
             <Card className="p-4">
               <p className="label-mono mb-3">Field readiness</p>
               <PermissionRow icon={MapPin} label="Location services" />
-              <PermissionRow icon={Compass} label="Compass access" />
+              <PermissionRow icon={Compass} label="Facing direction" />
               <PermissionRow icon={Sun} label="Screen wake lock" />
               <p className="mt-3 border-t border-line pt-3 font-mono text-[8px] leading-relaxed tracking-[0.1em] text-faint">
                 Location is requested when the round starts. On phones,
@@ -1125,7 +1125,7 @@ function PrepOverlay({
             {done
               ? hunter
                 ? "No runner intel until the first ping. Sweep the field and close in."
-                : "The clock is live. Keep moving, watch the compass, and survive."
+                : "The clock is live. Keep moving, watch the map, and survive."
               : hunter
               ? "Hunters must stay at the staging point. The first runner ping arrives after the prep countdown."
               : "Runners deploy now. Use the head start to break line of sight and find a hiding place."}

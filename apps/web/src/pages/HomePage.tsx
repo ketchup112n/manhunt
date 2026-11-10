@@ -19,7 +19,7 @@ const steps = [
     index: "02",
     icon: Compass,
     title: "Runners hold the line",
-    body: "A live compass points toward the nearest hunter with distance. Stay out of reach, keep moving, and survive the round.",
+    body: "A live field map keeps your squad and the caught sites in view, with a facing arrow on your own marker. Stay out of reach, keep moving, and survive the round.",
     meta: "Directional awareness",
     tone: "runner" as const,
   },
@@ -65,8 +65,8 @@ export function HomePage() {
 
             <p className="mt-7 max-w-md text-[15px] leading-relaxed text-muted sm:text-base">
               A live game of hide and seek across the real world. Hunters get
-              periodic location pings. Runners get a compass. The city decides
-              the rest.
+              periodic location pings. Runners get a live field map with a
+              facing arrow. The city decides the rest.
             </p>
 
             <div className="mt-8 flex flex-col gap-2.5 sm:flex-row">

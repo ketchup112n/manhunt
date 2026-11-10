@@ -100,7 +100,7 @@ export function SettingsPage() {
             <SettingSection
               icon={Ruler}
               title="Units"
-              description="Used for distance, radius, and compass readouts."
+              description="Used for distance, radius, and map readouts."
             >
               <SegmentedControl
                 value={units}
@@ -146,7 +146,7 @@ export function SettingsPage() {
             <SettingSection
               icon={Smartphone}
               title="Sensors"
-              description="Location is requested when the round starts. Other sensors are not wired up yet."
+              description="Location is requested when the round starts. Facing direction is requested separately on iOS."
             >
               <div className="space-y-2">
                 <PermissionLine icon={MapPin} label="Precise location" />
@@ -157,9 +157,8 @@ export function SettingsPage() {
               <div className="mt-3 flex items-start gap-2 rounded-[3px] border border-info/20 bg-info/5 px-3 py-2.5">
                 <Info className="mt-0.5 size-3.5 shrink-0 text-info" />
                 <p className="text-[10px] leading-relaxed text-muted">
-                  iOS requires a tap to enable compass access. This build uses
-                  real device location for the field map; compass values are
-                  still simulated.
+                  iOS requires a tap to grant access. Location and device facing
+                  direction are read from this device for the live field map.
                 </p>
               </div>
             </SettingSection>

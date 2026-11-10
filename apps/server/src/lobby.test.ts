@@ -336,6 +336,97 @@ test("all-hunter intel reveals hunter positions and hides the nearest hint", () 
   assert.equal(snapshot.nearestHunter, null);
 });
 
+test("all-hunter intel can be enabled from the lobby rules", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const runner = [...lobby.players.values()].find(
+    (player) => player.role === "runner",
+  )!;
+
+  movePlayer(lobby, hostId, 40.7, -74);
+  movePlayer(lobby, runner.id, 40.701, -74);
+
+  const hidden = lobby.snapshotFor(runner.id, false);
+  assert.equal(
+    hidden.players.find((player) => player.id === hostId)?.position,
+    undefined,
+  );
+
+  const update = lobby.handle(hostId, {
+    type: "updateSettings",
+    settings: { showAllHuntersToRunners: true },
+  });
+  assert.equal(update.error, undefined);
+  lobby.handle(hostId, { type: "start" });
+
+  const revealed = lobby.snapshotFor(runner.id, false);
+  assert.ok(
+    revealed.players.find((player) => player.id === hostId)?.position,
+  );
+  assert.equal(revealed.nearestHunter, null);
+});
+
+test("hunter team tracking controls hunter teammate positions", () => {
+  function trackingLobby(tracking: boolean): {
+    lobby: Lobby;
+    hostId: string;
+    teammateId: string;
+  } {
+    const lobby = new Lobby({
+      code: "TEAM12",
+      hostName: "ECHO",
+      settings: { ...DEFAULT_SETTINGS, prepSec: 0 },
+    });
+    const host = lobby.host!;
+    const teammate = lobby.addPlayer("SCOUT");
+    const runner = lobby.addPlayer("ROOK");
+    assert.ok("id" in teammate);
+    assert.ok("id" in runner);
+
+    lobby.handle(host.id, {
+      type: "assignRole",
+      playerId: host.id,
+      role: "hunter",
+    });
+    lobby.handle(host.id, {
+      type: "assignRole",
+      playerId: teammate.id,
+      role: "hunter",
+    });
+    lobby.handle(host.id, {
+      type: "assignRole",
+      playerId: runner.id,
+      role: "runner",
+    });
+    lobby.handle(host.id, {
+      type: "updateSettings",
+      settings: { showHunterTeammates: tracking },
+    });
+
+    movePlayer(lobby, host.id, 40.7, -74);
+    movePlayer(lobby, teammate.id, 40.701, -74);
+    movePlayer(lobby, runner.id, 40.702, -74);
+    lobby.handle(host.id, { type: "start" });
+
+    return { lobby, hostId: host.id, teammateId: teammate.id };
+  }
+
+  const enabled = trackingLobby(true);
+  assert.ok(
+    enabled.lobby
+      .snapshotFor(enabled.hostId, false)
+      .players.find((player) => player.id === enabled.teammateId)?.position,
+  );
+
+  const disabled = trackingLobby(false);
+  assert.equal(
+    disabled.lobby
+      .snapshotFor(disabled.hostId, false)
+      .players.find((player) => player.id === disabled.teammateId)?.position,
+    undefined,
+  );
+});
+
+
 test("a tagged runner leaves a frozen catch marker and keeps a self-only fix", () => {
   const { lobby, hostId } = lobbyWithPlayers(1);
   const runner = [...lobby.players.values()].find(

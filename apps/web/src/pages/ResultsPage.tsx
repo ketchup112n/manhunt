@@ -322,7 +322,7 @@ export function ResultsPage() {
               </p>
               <p className="mt-2 text-[11px] leading-relaxed text-muted">
                 {runnersWin
-                  ? "The runner compass kept the last survivor one step ahead."
+                  ? "The runner map kept the last survivor one step ahead."
                   : "Ping discipline and runner PIN tags decided the field."}
               </p>
               <div className="mt-4 flex items-center gap-2 border-t border-line pt-3">
