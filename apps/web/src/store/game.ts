@@ -53,6 +53,7 @@ interface GameStore {
   draftName: string;
   actionError: { message: string; at: number } | null;
   timeLeftSec: number;
+  revealEndsAt: number;
   prepRemainingSec: number;
   nextPingSec: number;
   lastPingAgo: number;
@@ -106,6 +107,7 @@ const initialState = {
   draftName: "",
   actionError: null as { message: string; at: number } | null,
   timeLeftSec: DEFAULT_SETTINGS.durationSec,
+  revealEndsAt: 0,
   prepRemainingSec: 0,
   nextPingSec: DEFAULT_SETTINGS.pingSec,
   lastPingAgo: 0,
@@ -248,6 +250,10 @@ export const useGame = create<GameStore>((set, get) => {
         isYou: player.id === state.youId,
       })),
       timeLeftSec: state.timeLeftSec,
+      revealEndsAt:
+        state.revealRemainingSec > 0
+          ? Date.now() + state.revealRemainingSec * 1000
+          : 0,
       prepRemainingSec: state.prepRemainingSec,
       nextPingSec: state.nextPingSec,
       lastPingAgo: state.lastPingAgo,

@@ -38,6 +38,7 @@ import {
   SettingsEditor,
   SettingsSummary,
 } from "@/components/game/SettingsEditor";
+import { RoleRevealOverlay } from "@/components/game/RoleRevealOverlay";
 import { useGame, useYou } from "@/store/game";
 import { formatClock } from "@/lib/geo";
 import { zoneScheduleFit, zoneScheduleLabel } from "@/lib/zone";
@@ -81,13 +82,15 @@ export function LobbyPage() {
   const canStart = hasHunters && hasRunners && unassigned.length === 0;
   const zoneFit = zoneScheduleFit(settings);
   const phaseLabel =
-    phase === "prep"
-      ? "Preparing"
-      : phase === "active"
-        ? "Live"
-        : phase === "ended"
-          ? "Ended"
-          : "Waiting";
+    phase === "reveal"
+      ? "Deploying"
+      : phase === "prep"
+        ? "Preparing"
+        : phase === "active"
+          ? "Live"
+          : phase === "ended"
+            ? "Ended"
+            : "Waiting";
 
   useEffect(() => {
     if (!bootstrapped) return;
@@ -141,6 +144,18 @@ export function LobbyPage() {
           ? "/game/hunter"
           : "/game/spectator",
     );
+  };
+
+  const deployRandomTeams = () => {
+    if (!isHost) {
+      toast("Only the host can deploy the round", { tone: "warning" });
+      return;
+    }
+    if (players.length < 2) {
+      toast("Add at least 2 players to deploy", { tone: "warning" });
+      return;
+    }
+    randomizeTeams();
   };
 
   const startOperation = () => {
@@ -297,11 +312,12 @@ export function LobbyPage() {
                 <p className="text-[11px] leading-relaxed text-muted">
                   Suggested balance is <span className="text-ink">1 hunter per 3 runners</span>.
                   Teams currently field {hunters.length} hunters and {runners.length} runners.
+                  Randomizing shuffles the teams and deploys the round.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={randomizeTeams}
+                onClick={deployRandomTeams}
                 disabled={!isHost || phase !== "lobby"}
                 className={cn(
                   "shrink-0 rounded-[2px] border px-3 py-2 font-mono text-[8px] uppercase tracking-[0.14em] transition-colors",
@@ -310,7 +326,7 @@ export function LobbyPage() {
                     : "border-line text-faint cursor-not-allowed",
                 )}
               >
-                Randomize teams
+                Randomize &amp; deploy
               </button>
             </div>
 
@@ -497,6 +513,8 @@ export function LobbyPage() {
       >
         <SettingsEditor />
       </Sheet>
+
+      {phase === "reveal" ? <RoleRevealOverlay /> : null}
 
       {phase === "prep" ? (
         <PrepOverlay

@@ -138,8 +138,8 @@ Make sure the platform forwards WebSocket upgrades to the same port.
 1. The host opens **Create lobby**, picks a display name, reviews the rules, and presses **Create lobby**.
 2. The server creates a six-character code and returns a private session token. The token is stored in `localStorage` so a reload reconnects the same player.
 3. Players open **Join**, enter the code and a name. They appear under **Standby** until the host assigns them.
-4. The host moves players between **Hunters** and **Runners** with the team buttons or drag-and-drop, or uses **Randomize teams**. Every player must be assigned before the round can start.
-5. The host starts the operation. The server runs the prep countdown, then activates the round. Phones follow the server clock and route each player to the correct screen.
+4. The host moves players between **Hunters** and **Runners** with the team buttons or drag-and-drop, or presses **Randomize & deploy**.
+5. **Randomize & deploy** shuffles the teams and immediately deploys: every phone shows the same six-second reveal, each player flips to their own role in the last two seconds, then the prep countdown starts. **Start operation** (manual teams) runs the same reveal.
 6. During the round, the server fires pings on schedule. Hunters see last-known runner positions for ten seconds after each ping.
 7. A hunter asks a caught runner for their four-digit PIN and enters it. The server validates the PIN, marks the runner caught, freezes a catch marker at their last fix, and moves them to spectator mode.
 8. The round ends when time expires, every runner is caught, or the host ends it early.

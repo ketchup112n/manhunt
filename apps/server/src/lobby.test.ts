@@ -1,8 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { Lobby, createLobbyCode, normalizeName, sanitizeSettings } from "./lobby.ts";
+import {
+  Lobby,
+  REVEAL_SEC,
+  createLobbyCode,
+  normalizeName,
+  sanitizeSettings,
+} from "./lobby.ts";
 import { DEFAULT_SETTINGS } from "./types.ts";
+
+/** Start the round and skip past the synchronized reveal. */
+function deploy(lobby: Lobby, hostId: string): void {
+  lobby.handle(hostId, { type: "start" });
+  lobby.tick(Date.now() + REVEAL_SEC * 1000 + 1);
+}
 
 function lobbyWithPlayers(count = 3): { lobby: Lobby; hostId: string } {
   const lobby = new Lobby({
@@ -63,6 +75,8 @@ test("starting requires both teams and every player assigned", () => {
   });
   const started = lobby.handle(host.id, { type: "start" });
   assert.equal(started.error, undefined);
+  assert.equal(lobby.phase, "reveal");
+  deploy(lobby, host.id);
   assert.equal(lobby.phase, "active");
 });
 
@@ -86,7 +100,7 @@ test("only the host can change rules or assign teams", () => {
 
 test("hunters tag active runners by their private PIN", () => {
   const { lobby, hostId } = lobbyWithPlayers();
-  lobby.handle(hostId, { type: "start" });
+  deploy(lobby, hostId);
   assert.equal(lobby.phase, "active");
 
   const runner = [...lobby.players.values()].find(
@@ -240,7 +254,7 @@ test("hunters see runners only during a ping window, frozen at ping time", () =>
   const runners = [...lobby.players.values()].filter(
     (player) => player.role === "runner",
   );
-  lobby.handle(hostId, { type: "start" });
+  deploy(lobby, hostId);
 
   runners.forEach((runner, index) => {
     movePlayer(lobby, runner.id, 40.7 + index * 0.001, -74);
@@ -287,7 +301,7 @@ test("runners see their squad and the nearest hunter bearing", () => {
   movePlayer(lobby, hostId, 40.7, -74);
   movePlayer(lobby, runners[0].id, 40.7005, -74);
   movePlayer(lobby, runners[1].id, 40.702, -74);
-  lobby.handle(hostId, { type: "start" });
+  deploy(lobby, hostId);
 
   const snapshot = lobby.snapshotFor(runners[0].id, false);
   const byId = new Map(snapshot.players.map((player) => [player.id, player]));
@@ -326,7 +340,7 @@ test("all-hunter intel reveals hunter positions and hides the nearest hint", () 
 
   movePlayer(lobby, host.id, 40.7, -74);
   movePlayer(lobby, guest.id, 40.701, -74);
-  lobby.handle(host.id, { type: "start" });
+  deploy(lobby, host.id);
 
   const snapshot = lobby.snapshotFor(guest.id, false);
   const hostPosition = snapshot.players.find(
@@ -356,7 +370,7 @@ test("all-hunter intel can be enabled from the lobby rules", () => {
     settings: { showAllHuntersToRunners: true },
   });
   assert.equal(update.error, undefined);
-  lobby.handle(hostId, { type: "start" });
+  deploy(lobby, hostId);
 
   const revealed = lobby.snapshotFor(runner.id, false);
   assert.ok(
@@ -405,7 +419,7 @@ test("hunter team tracking controls hunter teammate positions", () => {
     movePlayer(lobby, host.id, 40.7, -74);
     movePlayer(lobby, teammate.id, 40.701, -74);
     movePlayer(lobby, runner.id, 40.702, -74);
-    lobby.handle(host.id, { type: "start" });
+    deploy(lobby, host.id);
 
     return { lobby, hostId: host.id, teammateId: teammate.id };
   }
@@ -435,7 +449,7 @@ test("a tagged runner leaves a frozen catch marker and keeps a self-only fix", (
 
   movePlayer(lobby, hostId, 40.7, -74);
   movePlayer(lobby, runner.id, 40.705, -74);
-  lobby.handle(hostId, { type: "start" });
+  deploy(lobby, hostId);
 
   const tag = lobby.handle(hostId, {
     type: "submitTag",
@@ -484,10 +498,63 @@ test("a catch marker falls back to the hunter's fix when the runner has none", (
   )!;
 
   movePlayer(lobby, hostId, 51.5, -0.12);
-  lobby.handle(hostId, { type: "start" });
+  deploy(lobby, hostId);
   lobby.handle(hostId, { type: "submitTag", code: runner.tagCode });
 
   const spot = lobby.snapshotFor(hostId, false).caughtSpots[0];
   assert.equal(spot.lat, 51.5);
   assert.equal(spot.lng, -0.12);
+});
+
+test("randomize teams deploys straight into the reveal", () => {
+  const { lobby, hostId } = lobbyWithPlayers(3);
+
+  const result = lobby.handle(hostId, { type: "randomizeTeams" });
+  assert.equal(result.error, undefined);
+  assert.equal(lobby.phase, "reveal");
+  assert.equal(lobby.snapshotFor(hostId, false).revealRemainingSec, REVEAL_SEC);
+
+  for (const player of lobby.players.values()) {
+    assert.notEqual(player.role, "unassigned");
+  }
+
+  lobby.tick(Date.now() + REVEAL_SEC * 1000 + 1);
+  assert.equal(lobby.phase, "active");
+  assert.equal(lobby.snapshotFor(hostId, false).revealRemainingSec, 0);
+});
+
+test("the reveal hands over to the prep countdown", () => {
+  const lobby = new Lobby({
+    code: "PREP12",
+    hostName: "ECHO",
+    settings: { ...DEFAULT_SETTINGS, prepSec: 30 },
+  });
+  const host = lobby.host!;
+  lobby.addBots(1);
+
+  lobby.handle(host.id, { type: "randomizeTeams" });
+  assert.equal(lobby.phase, "reveal");
+
+  lobby.tick(Date.now() + REVEAL_SEC * 1000 + 1);
+  assert.equal(lobby.phase, "prep");
+  assert.ok(lobby.snapshotFor(host.id, false).prepRemainingSec > 0);
+});
+
+test("randomize teams needs at least two players", () => {
+  const lobby = new Lobby({ code: "SOLO12", hostName: "ECHO" });
+  const host = lobby.host!;
+
+  const result = lobby.handle(host.id, { type: "randomizeTeams" });
+  assert.match(result.error ?? "", /at least 2 players/);
+  assert.equal(lobby.phase, "lobby");
+});
+
+test("late arrivals during the reveal are dealt a role", () => {
+  const { lobby, hostId } = lobbyWithPlayers(3);
+  lobby.handle(hostId, { type: "randomizeTeams" });
+
+  const guest = lobby.addPlayer("WREN");
+  assert.ok("id" in guest);
+  assert.notEqual(guest.role, "unassigned");
+  assert.equal(guest.status, "active");
 });

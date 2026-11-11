@@ -1,5 +1,5 @@
 export type Role = "hunter" | "runner" | "unassigned";
-export type GamePhase = "lobby" | "prep" | "active" | "ended";
+export type GamePhase = "lobby" | "reveal" | "prep" | "active" | "ended";
 export type Winner = "hunters" | "runners";
 export type TagState = "idle" | "success" | "invalid" | "no-target";
 
@@ -82,6 +82,8 @@ export interface Snapshot {
   players: PublicPlayer[];
   youId: string;
   timeLeftSec: number;
+  /** Seconds left in the synchronized role reveal, 0 outside that phase. */
+  revealRemainingSec: number;
   prepRemainingSec: number;
   nextPingSec: number;
   lastPingAgo: number;

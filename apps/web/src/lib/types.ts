@@ -1,7 +1,7 @@
 export type Role = "hunter" | "runner" | "unassigned";
 export type Theme = "dark" | "light";
 export type Units = "metric" | "imperial";
-export type GamePhase = "lobby" | "prep" | "active" | "ended";
+export type GamePhase = "lobby" | "reveal" | "prep" | "active" | "ended";
 export type TagState = "idle" | "success" | "invalid" | "no-target";
 export type Winner = "hunters" | "runners";
 
@@ -94,6 +94,7 @@ export interface Snapshot {
   players: Omit<Player, "isYou">[];
   youId: string;
   timeLeftSec: number;
+  revealRemainingSec: number;
   prepRemainingSec: number;
   nextPingSec: number;
   lastPingAgo: number;

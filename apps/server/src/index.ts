@@ -377,7 +377,12 @@ const ticker = setInterval(() => {
   const now = Date.now();
   for (const [code, lobby] of lobbies) {
     const changed = lobby.tick(now);
-    if (changed || lobby.phase === "prep" || lobby.phase === "active") {
+    if (
+      changed ||
+      lobby.phase === "reveal" ||
+      lobby.phase === "prep" ||
+      lobby.phase === "active"
+    ) {
       broadcast(lobby);
     }
     if (lobby.empty) {

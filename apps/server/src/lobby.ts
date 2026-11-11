@@ -35,6 +35,9 @@ const BOT_NAMES = [
 
 const MAX_CODE_ATTEMPTS = 10;
 
+/** Length of the synchronized role reveal before the prep countdown. */
+export const REVEAL_SEC = 6;
+
 export interface LobbyPlayer {
   id: string;
   token: string;
@@ -78,6 +81,7 @@ export class Lobby {
   resultWinner: Winner | null = null;
 
   private prepEndsAt = 0;
+  private revealEndsAt = 0;
   private startedAt = 0;
   private endsAt = 0;
   private nextPingAt = 0;
@@ -153,7 +157,22 @@ export class Lobby {
     if (this.isFull) return { error: "This lobby is full." };
     const player = this.createPlayer(rawName);
     this.players.set(player.id, player);
+    // Late arrivals during the reveal are dealt straight into the round.
+    if (this.phase === "reveal") {
+      player.role = this.openRole();
+      player.status = "active";
+      player.caughtAt = null;
+      player.ready = true;
+    }
     return player;
+  }
+
+  /** Smaller team, coin-flip when the teams are even. */
+  private openRole(): Role {
+    const hunters = this.countRole("hunter");
+    const runners = this.countRole("runner");
+    if (hunters === runners) return Math.random() < 0.5 ? "hunter" : "runner";
+    return hunters < runners ? "hunter" : "runner";
   }
 
   addBots(rawCount = 8): number {
@@ -249,6 +268,11 @@ export class Lobby {
   tick(now = Date.now()): boolean {
     let changed = false;
 
+    if (this.phase === "reveal" && now >= this.revealEndsAt) {
+      this.beginPrep(now);
+      changed = true;
+    }
+
     if (this.phase === "prep" && now >= this.prepEndsAt) {
       this.beginActive(now);
       changed = true;
@@ -265,6 +289,23 @@ export class Lobby {
     }
 
     return changed;
+  }
+
+  /** Deploy: hold the roster for a synchronized role reveal before prep. */
+  private beginReveal(now: number): void {
+    this.phase = "reveal";
+    this.resultWinner = null;
+    if (!this.center) this.center = this.anchorFromPlayers();
+    this.revealEndsAt = now + REVEAL_SEC * 1000;
+    if (REVEAL_SEC <= 0) this.beginPrep(now);
+  }
+
+  private beginPrep(now: number): void {
+    this.phase = "prep";
+    this.resultWinner = null;
+    if (!this.center) this.center = this.anchorFromPlayers();
+    this.prepEndsAt = now + Math.max(0, this.settings.prepSec) * 1000;
+    if (this.settings.prepSec <= 0) this.beginActive(now);
   }
 
   private beginActive(now: number): void {
@@ -373,7 +414,14 @@ export class Lobby {
         if (this.phase !== "lobby") {
           return { changed: false, error: "Teams are locked once prep begins." };
         }
+        if (this.players.size < 2) {
+          return {
+            changed: false,
+            error: "Add at least 2 players before deploying.",
+          };
+        }
         this.assignRandomTeams();
+        this.beginReveal(Date.now());
         return { changed: true };
       }
 
@@ -403,11 +451,7 @@ export class Lobby {
             error: `Assign every player first (${unassigned} still unassigned).`,
           };
         }
-        this.phase = "prep";
-        this.center = this.anchorFromPlayers();
-        this.prepEndsAt = Date.now() + Math.max(0, this.settings.prepSec) * 1000;
-        this.resultWinner = null;
-        if (this.settings.prepSec <= 0) this.beginActive(Date.now());
+        this.beginReveal(Date.now());
         return { changed: true };
       }
 
@@ -453,7 +497,12 @@ export class Lobby {
           accuracyM: clamp(accuracyM, 0, 5000),
           at: Date.now(),
         };
-        if (!this.center && (this.phase === "prep" || this.phase === "active")) {
+        if (
+          !this.center &&
+          (this.phase === "reveal" ||
+            this.phase === "prep" ||
+            this.phase === "active")
+        ) {
           this.center = { lat, lng };
         }
         return { changed: false };
@@ -699,6 +748,10 @@ export class Lobby {
       players,
       youId: viewerId,
       timeLeftSec,
+      revealRemainingSec:
+        phase === "reveal"
+          ? Math.max(0, Math.ceil((this.revealEndsAt - now) / 1000))
+          : 0,
       prepRemainingSec:
         phase === "prep"
           ? Math.max(0, Math.ceil((this.prepEndsAt - now) / 1000))
