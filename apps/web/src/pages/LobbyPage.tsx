@@ -409,17 +409,18 @@ export function LobbyPage() {
                   <Shuffle className="size-4" />
                   Randomize &amp; deploy
                 </Button>
-                {canStart ? (
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    full
-                    onClick={startOperation}
-                  >
-                    <Play className="size-3.5" />
-                    Start with assigned teams
-                  </Button>
-                ) : null}
+                <Button
+                  variant="secondary"
+                  size="md"
+                  full
+                  onClick={startOperation}
+                  disabled={!canStart}
+                >
+                  <Play className="size-3.5" />
+                  {canStart
+                    ? "Start with assigned teams"
+                    : "Assign teams to start"}
+                </Button>
                 <p className="text-center font-mono text-[8px] uppercase tracking-[0.16em] text-faint">
                   {players.length < 2
                     ? "Add at least 2 players to deploy"
@@ -460,17 +461,16 @@ export function LobbyPage() {
               <Shuffle className="size-4" />
               Randomize &amp; deploy
             </Button>
-            {canStart ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                full
-                onClick={startOperation}
-              >
-                <Play className="size-3.5" />
-                Start with assigned teams
-              </Button>
-            ) : null}
+            <Button
+              variant="secondary"
+              size="sm"
+              full
+              onClick={startOperation}
+              disabled={!canStart}
+            >
+              <Play className="size-3.5" />
+              {canStart ? "Start with assigned teams" : "Assign teams to start"}
+            </Button>
           </div>
         ) : (
           <p className="py-2 text-center font-mono text-[9px] uppercase tracking-[0.16em] text-faint">

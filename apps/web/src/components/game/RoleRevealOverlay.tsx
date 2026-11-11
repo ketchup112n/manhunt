@@ -6,8 +6,9 @@ import { RoleBadge } from "@/components/hud/RoleBadge";
 import { useGame, useYou } from "@/store/game";
 import {
   REVEAL_HOLD_MS,
-  revealCountdownSec,
+  revealHoldSec,
   revealStage,
+  revealSuspenseSec,
 } from "@/lib/reveal";
 import { cn } from "@/lib/cn";
 
@@ -39,7 +40,8 @@ export function RoleRevealOverlay() {
 
   const remainingMs = Math.max(0, revealEndsAt - now);
   const stage = revealStage(remainingMs);
-  const countdown = revealCountdownSec(remainingMs);
+  const suspenseSec = revealSuspenseSec(remainingMs);
+  const holdSec = revealHoldSec(remainingMs);
   const role = you?.role ?? "unassigned";
   const hunter = role === "hunter";
   const runner = role === "runner";
@@ -194,14 +196,17 @@ export function RoleRevealOverlay() {
                     Assigning teams
                   </p>
                   <motion.p
-                    key={countdown}
+                    key={suspenseSec}
                     initial={reduceMotion ? false : { scale: 1.18, opacity: 0.5 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: 0.28 }}
                     className="mt-2 font-mono text-6xl tabular tracking-[-0.05em] text-ink sm:text-7xl"
                   >
-                    {countdown}
+                    {suspenseSec}
                   </motion.p>
+                  <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.24em] text-faint">
+                    Until roles drop
+                  </p>
                 </div>
               </div>
 
@@ -294,6 +299,9 @@ export function RoleRevealOverlay() {
                 />
               </div>
               <p className="relative mt-3 font-mono text-[8px] uppercase tracking-[0.18em] text-faint">
+                Deploying in {holdSec}s
+              </p>
+              <p className="relative mt-1 font-mono text-[8px] uppercase tracking-[0.18em] text-faint">
                 {hunters} hunters / {runners} runners
               </p>
             </motion.div>
