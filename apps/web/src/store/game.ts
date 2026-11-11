@@ -93,6 +93,7 @@ interface GameStore {
   setLivePosition: (position: GeoPosition) => void;
   setPositionStatus: (status: PositionStatus, error?: string | null) => void;
   resetGame: () => void;
+  dismissReveal: () => void;
   clearActionError: () => void;
 }
 
@@ -547,6 +548,10 @@ export const useGame = create<GameStore>((set, get) => {
 
     resetGame: () => {
       get().leaveLobby();
+    },
+
+    dismissReveal: () => {
+      set({ revealEndsAt: 0 });
     },
 
     clearActionError: () => set({ actionError: null }),

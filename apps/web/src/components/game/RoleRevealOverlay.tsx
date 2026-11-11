@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Crosshair, Radar, Rabbit } from "lucide-react";
 import { RoleBadge } from "@/components/hud/RoleBadge";
+import { Button } from "@/components/ui/Button";
 import { useGame, useYou } from "@/store/game";
 import {
   REVEAL_HOLD_MS,
@@ -30,6 +31,8 @@ export function RoleRevealOverlay() {
   const players = useGame((state) => state.players);
   const code = useGame((state) => state.code);
   const revealEndsAt = useGame((state) => state.revealEndsAt);
+  const connection = useGame((state) => state.connection);
+  const dismissReveal = useGame((state) => state.dismissReveal);
   const reduceMotion = useReducedMotion();
   const [now, setNow] = useState(() => Date.now());
   const [scan, setScan] = useState(0);
@@ -143,7 +146,7 @@ export function RoleRevealOverlay() {
           <span className="label-mono text-muted">Deployment phase</span>
         </div>
         <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-faint">
-          Lobby {code}
+          {connection === "connected" ? `Lobby ${code}` : "Reconnecting"}
         </span>
       </header>
 
@@ -312,6 +315,16 @@ export function RoleRevealOverlay() {
               <p className="relative mt-1 font-mono text-[8px] uppercase tracking-[0.18em] text-faint">
                 {hunters} hunters / {runners} runners
               </p>
+
+              <div className="relative mt-6 flex justify-center">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={dismissReveal}
+                >
+                  Continue to the field
+                </Button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
