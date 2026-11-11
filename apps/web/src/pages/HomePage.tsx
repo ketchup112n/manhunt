@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight, Crosshair, Radar, Compass, Fingerprint } from "lucide-react";
+import { ArrowUpRight, Crosshair, Radar, Navigation, Fingerprint } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { RadarPanel } from "@/components/game/RadarPanel";
 import { buttonStyles } from "@/components/ui/Button";
@@ -17,7 +17,7 @@ const steps = [
   },
   {
     index: "02",
-    icon: Compass,
+    icon: Navigation,
     title: "Runners hold the line",
     body: "A live field map keeps your squad and the caught sites in view, with a facing arrow on your own marker. Stay out of reach, keep moving, and survive the round.",
     meta: "Directional awareness",

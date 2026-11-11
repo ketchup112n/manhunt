@@ -335,7 +335,7 @@ export function SettingsEditor({ compact }: { compact?: boolean }) {
         icon={SlidersHorizontal}
         index="04"
         title="Advanced protocol"
-        summary="Update rate, player cap, sensor cadence."
+        summary="Update rate and player cap."
         expanded={open.advanced}
         onToggle={() => toggle("advanced")}
         compact={compact}
@@ -352,20 +352,6 @@ export function SettingsEditor({ compact }: { compact?: boolean }) {
             display={`${settings.locationIntervalSec} s`}
             minLabel="2 s"
             maxLabel="15 s"
-            compact={compact}
-          />
-          <div className={cn("hairline", compact && "my-1.5")} />
-          <CompactSlider
-            label="Compass refresh"
-            hint="How often runner bearings are recalculated."
-            value={settings.compassIntervalSec}
-            min={1}
-            max={10}
-            step={1}
-            onChange={(value) => set("compassIntervalSec", value)}
-            display={`${settings.compassIntervalSec} s`}
-            minLabel="1 s"
-            maxLabel="10 s"
             compact={compact}
           />
           <div className={cn("hairline", compact && "my-1.5")} />

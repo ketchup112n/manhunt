@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Compass,
   Crosshair,
   Eye,
   Flag,
@@ -9,6 +8,7 @@ import {
   Home,
   LogIn,
   Moon,
+  Navigation,
   Play,
   Rabbit,
   Radio,
@@ -264,8 +264,8 @@ export function DevPanel() {
             <SectionLabel label="Sensor simulation" meta={`${Math.round(deviceHeading)}°`} />
             <div className="rounded-[3px] border border-line bg-surface-2/40 px-3.5 py-3">
               <Slider
-                label="Compass heading"
-                hint="Simulates the phone pointing direction on the runner HUD."
+                label="Facing direction"
+                hint="Simulates the phone pointing direction on the field map."
                 value={deviceHeading}
                 min={0}
                 max={359}
@@ -278,8 +278,8 @@ export function DevPanel() {
               />
               <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5">
                 <span className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
-                  <Compass className="size-3" />
-                  Runner view only
+                  <Navigation className="size-3" />
+                  Runner + hunter view
                 </span>
                 <div className="flex gap-1">
                   {[0, 90, 180, 270].map((angle) => (

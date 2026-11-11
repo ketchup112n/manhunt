@@ -20,7 +20,7 @@ function orientationConstructor(): OrientationConstructor | null {
   return window.DeviceOrientationEvent as OrientationConstructor;
 }
 
-/** Compass heading clockwise from north, or null when the event has no usable value. */
+/** Heading clockwise from north, or null when the event has no usable value. */
 function headingFromEvent(event: DeviceOrientationEvent): number | null {
   const webkitHeading = (
     event as DeviceOrientationEvent & { webkitCompassHeading?: number }
@@ -35,9 +35,9 @@ function headingFromEvent(event: DeviceOrientationEvent): number | null {
 }
 
 /**
- * Subscribes to the device orientation sensor and writes the compass heading
- * into the game store. iOS requires a user gesture before the sensor can be
- * read, so `enable` must be called from a click handler on those devices.
+ * Subscribes to the device orientation sensor and writes the heading into the
+ * game store. iOS requires a user gesture before the sensor can be read, so
+ * `enable` must be called from a click handler on those devices.
  */
 export function useDeviceHeading() {
   const setDeviceHeading = useGame((state) => state.setDeviceHeading);

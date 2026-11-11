@@ -788,7 +788,6 @@ export function sanitizeSettings(settings: GameSettings): GameSettings {
     locationIntervalSec: Math.round(
       clamp(settings.locationIntervalSec, 1, 300),
     ),
-    compassIntervalSec: Math.round(clamp(settings.compassIntervalSec, 1, 120)),
     maxPlayers: Math.round(clamp(settings.maxPlayers, 2, 50)),
     zoneEnabled: Boolean(settings.zoneEnabled),
     zoneShrinkIntervalSec: Math.round(

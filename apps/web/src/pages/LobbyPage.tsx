@@ -5,12 +5,12 @@ import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowRight,
   Check,
-  Compass,
   Copy,
   Crown,
   Crosshair,
   GripVertical,
   MapPin,
+  Navigation,
   Play,
   Plus,
   QrCode,
@@ -383,7 +383,7 @@ export function LobbyPage() {
             <Card className="p-4">
               <p className="label-mono mb-3">Field readiness</p>
               <PermissionRow icon={MapPin} label="Location services" />
-              <PermissionRow icon={Compass} label="Facing direction" />
+              <PermissionRow icon={Navigation} label="Facing direction" />
               <PermissionRow icon={Sun} label="Screen wake lock" />
               <p className="mt-3 border-t border-line pt-3 font-mono text-[8px] leading-relaxed tracking-[0.1em] text-faint">
                 Location is requested when the round starts. On phones,

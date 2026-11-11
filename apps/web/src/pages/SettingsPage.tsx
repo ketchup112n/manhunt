@@ -1,10 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import {
-  Compass,
   Info,
   MapPin,
   Monitor,
   Moon,
+  Navigation,
   RotateCcw,
   Ruler,
   Smartphone,
@@ -150,7 +150,7 @@ export function SettingsPage() {
             >
               <div className="space-y-2">
                 <PermissionLine icon={MapPin} label="Precise location" />
-                <PermissionLine icon={Compass} label="Device compass" />
+                <PermissionLine icon={Navigation} label="Facing direction" />
                 <PermissionLine icon={Sun} label="Screen wake lock" />
                 <PermissionLine icon={Monitor} label="Fullscreen mode" />
               </div>

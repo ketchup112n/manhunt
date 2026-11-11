@@ -4,7 +4,7 @@ export type PlayerMarkerRole = "self" | "hunter" | "runner" | "caught";
 
 export interface PlayerMarkerOptions {
   ping?: boolean;
-  /** Compass heading in degrees, clockwise from north. */
+  /** Heading in degrees, clockwise from north. */
   heading?: number | null;
 }
 

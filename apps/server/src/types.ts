@@ -13,7 +13,6 @@ export interface GameSettings {
   allowLateJoin: boolean;
   allowSpectators: boolean;
   locationIntervalSec: number;
-  compassIntervalSec: number;
   maxPlayers: number;
   zoneEnabled: boolean;
   zoneShrinkIntervalSec: number;
@@ -31,7 +30,6 @@ export const DEFAULT_SETTINGS: GameSettings = {
   allowLateJoin: true,
   allowSpectators: true,
   locationIntervalSec: 5,
-  compassIntervalSec: 3,
   maxPlayers: 20,
   zoneEnabled: false,
   zoneShrinkIntervalSec: 300,
