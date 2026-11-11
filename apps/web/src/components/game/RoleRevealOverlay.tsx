@@ -6,6 +6,7 @@ import { RoleBadge } from "@/components/hud/RoleBadge";
 import { useGame, useYou } from "@/store/game";
 import {
   REVEAL_HOLD_MS,
+  REVEAL_TOTAL_MS,
   revealHoldSec,
   revealStage,
   revealSuspenseSec,
@@ -38,7 +39,12 @@ export function RoleRevealOverlay() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const remainingMs = Math.max(0, revealEndsAt - now);
+  // The reveal is presentation-only: keep it up until its own clock runs out,
+  // even if the server has already moved to prep or active underneath.
+  const active = revealEndsAt > 0 && now < revealEndsAt;
+  const remainingMs = active
+    ? Math.min(REVEAL_TOTAL_MS, revealEndsAt - now)
+    : 0;
   const stage = revealStage(remainingMs);
   const suspenseSec = revealSuspenseSec(remainingMs);
   const holdSec = revealHoldSec(remainingMs);
@@ -80,21 +86,23 @@ export function RoleRevealOverlay() {
   );
 
   useEffect(() => {
-    if (stage !== "suspense") return;
+    if (!active || stage !== "suspense") return;
     const timer = window.setInterval(
       () => setScan((value) => value + 1),
       420,
     );
     return () => window.clearInterval(timer);
-  }, [stage]);
+  }, [active, stage]);
 
   useEffect(() => {
-    if (stage !== "revealed" || reduceMotion) return;
+    if (!active || stage !== "revealed" || reduceMotion) return;
     const timer = window.setTimeout(() => {
       navigator.vibrate?.([40, 60, 140]);
     }, 80);
     return () => window.clearTimeout(timer);
-  }, [stage, reduceMotion]);
+  }, [active, stage, reduceMotion]);
+
+  if (!active) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex flex-col overflow-hidden bg-canvas">

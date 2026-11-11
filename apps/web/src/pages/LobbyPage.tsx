@@ -39,7 +39,6 @@ import {
   SettingsEditor,
   SettingsSummary,
 } from "@/components/game/SettingsEditor";
-import { RoleRevealOverlay } from "@/components/game/RoleRevealOverlay";
 import { useGame, useYou } from "@/store/game";
 import { formatClock } from "@/lib/geo";
 import { zoneScheduleFit, zoneScheduleLabel } from "@/lib/zone";
@@ -529,8 +528,6 @@ export function LobbyPage() {
       >
         <SettingsEditor />
       </Sheet>
-
-      {phase === "reveal" ? <RoleRevealOverlay /> : null}
 
       {phase === "prep" ? (
         <PrepOverlay

@@ -17,6 +17,7 @@ import {
   type Winner,
 } from "@/lib/types";
 import { computeZoneState, type ZoneState } from "@/lib/zone";
+import { revealDeadline } from "@/lib/reveal";
 
 const SESSION_KEY = "manhunt-session";
 const NAME_KEY = "manhunt-name";
@@ -241,6 +242,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 export const useGame = create<GameStore>((set, get) => {
   function applySnapshot(state: Snapshot): void {
+    const previous = get();
+    const now = Date.now();
     set({
       code: state.code,
       phase: state.phase,
@@ -250,10 +253,13 @@ export const useGame = create<GameStore>((set, get) => {
         isYou: player.id === state.youId,
       })),
       timeLeftSec: state.timeLeftSec,
-      revealEndsAt:
-        state.revealRemainingSec > 0
-          ? Date.now() + state.revealRemainingSec * 1000
-          : 0,
+      revealEndsAt: revealDeadline({
+        previousPhase: previous.phase,
+        phase: state.phase,
+        currentEndsAt: previous.revealEndsAt,
+        serverRemainingSec: state.revealRemainingSec,
+        now,
+      }),
       prepRemainingSec: state.prepRemainingSec,
       nextPingSec: state.nextPingSec,
       lastPingAgo: state.lastPingAgo,

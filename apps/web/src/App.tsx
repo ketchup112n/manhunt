@@ -10,6 +10,7 @@ import {
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { DevPanel } from "@/components/game/DevPanel";
 import { LocationSync } from "@/components/game/LocationSync";
+import { RoleRevealOverlay } from "@/components/game/RoleRevealOverlay";
 import { usePreferences } from "@/store/preferences";
 import { useGame, useYou } from "@/store/game";
 import { HomePage } from "@/pages/HomePage";
@@ -146,6 +147,7 @@ export function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
+        <RoleRevealOverlay />
         <DevPanel />
       </BrowserRouter>
     </ToastProvider>
