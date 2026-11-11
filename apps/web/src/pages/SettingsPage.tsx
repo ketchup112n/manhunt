@@ -157,8 +157,9 @@ export function SettingsPage() {
               <div className="mt-3 flex items-start gap-2 rounded-[3px] border border-info/20 bg-info/5 px-3 py-2.5">
                 <Info className="mt-0.5 size-3.5 shrink-0 text-info" />
                 <p className="text-[10px] leading-relaxed text-muted">
-                  iOS requires a tap to grant access. Location and device facing
-                  direction are read from this device for the live field map.
+                  iOS asks once, then remembers your choice. Location and device
+                  facing direction are read from this device for the live field
+                  map; facing switches on with your first tap on the field page.
                 </p>
               </div>
             </SettingSection>

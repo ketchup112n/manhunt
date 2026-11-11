@@ -210,9 +210,7 @@ export function RunnerPage() {
                     ? `${hunters.length} hunters visible`
                     : "Squad view"}
                 </Chip>
-                {headingStatus === "needs-permission" ||
-                headingStatus === "denied" ||
-                headingStatus === "pending" ? (
+                {headingStatus === "denied" || headingStatus === "pending" ? (
                   <button
                     type="button"
                     onClick={() => void enableHeading()}

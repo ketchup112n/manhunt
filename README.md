@@ -146,7 +146,7 @@ Make sure the platform forwards WebSocket upgrades to the same port.
 
 ### Runner map and catch markers
 
-Runners get a live field map. The self marker on both the runner and hunter maps carries a small arrow on the rim of the avatar showing the direction the phone is facing, sourced from the device orientation sensor. iOS requires a tap on **Enable facing** before the sensor can be read; other platforms start listening automatically where the browser allows it.
+Runners get a live field map. The self marker on both the runner and hunter maps carries a small arrow on the rim of the avatar showing the direction the phone is facing, sourced from the device orientation sensor. Facing turns on automatically: on iOS the permission prompt is raised on your first tap on the field page and the choice is remembered, while other platforms start listening immediately where the browser allows it.
 
 Caught runners keep streaming their own GPS so their spectator map still tracks them, but the server hides that position from everyone else. The spot where each runner was tagged stays on every viewer's map for the rest of the round, even if the player keeps moving.
 
@@ -209,7 +209,7 @@ apps/
 ## Current limitations
 
 - **No accounts or persistence.** Lobbies live in server memory and disappear after six idle hours or a server restart. A restart requires players to join again.
-- **GPS and facing need permission and HTTPS.** The browser geolocation API streams precise fixes to the server during prep and the active round. Denied or unavailable fixes surface as an in-game banner. The facing arrow needs device orientation access, which iOS only grants after a tap on **Enable facing**.
+- **GPS and facing need permission and HTTPS.** The browser geolocation API streams precise fixes to the server during prep and the active round. Denied or unavailable fixes surface as an in-game banner. The facing arrow needs device orientation access, which iOS only grants after a gesture; the app asks on your first tap on the field page and remembers the choice.
 - **No pressure testing.** One process, in-memory state, and no rate limiting; suitable for a friend-group game, not a public deployment.
 - **Map tiles require network access.** Leaflet renders OpenStreetMap tiles with a CSS filter for the dark theme.
 - **Basic resilience only.** The client reconnects with backoff, but the host keeps their role while offline and there is no host migration during a round.

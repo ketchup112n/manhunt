@@ -22,7 +22,7 @@ import {
 import { HunterMap } from "@/components/game/HunterMap";
 import { GpsBanner } from "@/components/game/GpsBanner";
 import { EndMatchModal } from "@/components/game/EndMatchModal";
-import { ZonePanel, ZoneRuleNote, ZoneStatusChip } from "@/components/game/ZoneHud";
+import { ZoneRuleNote, ZoneStatusChip } from "@/components/game/ZoneHud";
 import { RoleBadge } from "@/components/hud/RoleBadge";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -31,10 +31,7 @@ import { ProgressRing } from "@/components/ui/ProgressRing";
 import { Sheet } from "@/components/ui/Sheet";
 import { useToast } from "@/components/ui/Toast";
 import {
-  distanceMeters,
-  formatAgo,
   formatClock,
-  formatDistance,
   formatLongClock,
   formatRadius,
 } from "@/lib/geo";
@@ -77,7 +74,6 @@ export function HunterPage() {
   const activeRunners = players.filter(
     (player) => player.role === "runner" && player.status === "active",
   );
-  const awaitingFirstPing = pingCount === 0;
 
   /** Prefer the newest device fix over the last one the server echoed back. */
   const selfFix = livePosition ?? you?.position ?? null;
@@ -162,8 +158,8 @@ export function HunterPage() {
   };
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-canvas lg:flex-row">
-      <div className="relative min-h-0 flex-1">
+    <div className="relative h-dvh overflow-hidden bg-canvas">
+      <div className="absolute inset-0">
         <HunterMap
           self={self}
           hunters={hunters}
@@ -176,7 +172,7 @@ export function HunterPage() {
         />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(4,9,10,0.62),transparent_30%,transparent_70%,rgba(4,9,10,0.3))]" />
         <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/5" />
-        <GpsBanner className="absolute bottom-4 left-3 z-[405] max-w-[280px] lg:bottom-5 lg:left-5" />
+        <GpsBanner className="absolute bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] left-3 z-[405] max-w-[280px] lg:left-5" />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[400] px-3 pt-3 safe-top sm:px-4">
           <div className="pointer-events-auto mx-auto flex max-w-5xl items-start justify-between gap-2">
@@ -237,9 +233,7 @@ export function HunterPage() {
             </div>
           </div>
 
-          {headingStatus === "needs-permission" ||
-          headingStatus === "denied" ||
-          headingStatus === "pending" ? (
+          {headingStatus === "denied" || headingStatus === "pending" ? (
             <div className="pointer-events-auto mx-auto mt-1.5 flex max-w-5xl">
               <button
                 type="button"
@@ -289,190 +283,26 @@ export function HunterPage() {
         </div>
       </div>
 
-      <aside className="relative z-[420] flex h-[46dvh] shrink-0 flex-col border-t border-line bg-surface shadow-[0_-24px_80px_rgb(0_0_0/0.32)] lg:h-auto lg:w-[390px] lg:border-l lg:border-t-0 lg:shadow-none">
-        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-          <div>
-            <p className="label-mono mb-1">Field intel</p>
-            <h1 className="font-display text-xl font-semibold uppercase leading-none tracking-[0.03em] text-ink">
-              Runner signals
-            </h1>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Chip tone="runner" dot>
-              {activeRunners.length} active
-            </Chip>
-            <Chip tone="hunter">{pingCount} pings</Chip>
-          </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[420]">
+        <div className="flex justify-end px-3 pb-1.5">
+          <SignalQuality />
         </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="hidden border-b border-line px-4 py-3.5 lg:block">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[8px] uppercase tracking-[0.16em] text-faint">
-                Ping cycle
-              </span>
-              <span className="font-mono text-[9px] tabular text-ink">
-                {formatClock(nextPingSec)} / {formatClock(settings.pingSec)}
-              </span>
-            </div>
-            <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3">
-              <div
-                className="h-full rounded-full bg-hunter transition-[width] duration-1000 ease-linear"
-                style={{ width: `${Math.min(100, pingProgress * 100)}%` }}
-              />
-            </div>
-            <p className="mt-2 text-[10px] leading-relaxed text-muted">
-              Next runner coordinates in{" "}
-              <span className="text-ink">{formatClock(nextPingSec)}</span>. Stay moving.
-            </p>
-          </div>
-
-          <div className="space-y-2 p-3">
-            <ZonePanel tone="hunter" />
-
-            {signals.map((signal) => {
-              const distance = self ? distanceMeters(self, signal) : null;
-              return (
-                <div
-                  key={signal.id}
-                  className="group relative overflow-hidden rounded-[3px] border border-line bg-surface-2/45 px-3 py-3 transition-colors hover:border-line-strong"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="relative flex size-8 shrink-0 items-center justify-center">
-                      <span className="absolute inset-0 animate-ping rounded-full border border-runner/20" />
-                      <span className="flex size-7 items-center justify-center rounded-full border border-runner/30 bg-runner/10 font-mono text-[8px] text-runner">
-                        {signal.id.slice(0, 2).toUpperCase()}
-                      </span>
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink">
-                          {signal.name}
-                        </p>
-                        <Chip tone="runner" className="h-4 px-1.5 text-[7px]">
-                          Located
-                        </Chip>
-                      </div>
-                      <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.12em] text-faint">
-                        Seen {formatAgo(signal.seenAt)} / ±{signal.accuracyM}m
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-[10px] tabular text-ink">
-                        {distance === null ? "—" : formatDistance(distance, units)}
-                      </p>
-                      <p className="mt-1 font-mono text-[7px] uppercase tracking-[0.14em] text-faint">
-                        From you
-                      </p>
-                    </div>
-                    <ChevronRight className="size-3.5 text-faint transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                </div>
-              );
-            })}
-
-            {signals.length === 0 ? (
-              awaitingFirstPing ? (
-                <div className="rounded-[3px] border border-line bg-surface-2/40 px-4 py-6 text-center">
-                  <Radar className="mx-auto size-5 animate-soft-pulse text-hunter" />
-                  <p className="mt-3 font-display text-lg font-semibold uppercase text-ink">
-                    No intel yet
-                  </p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                    First runner ping in{" "}
-                    <span className="text-ink">{formatClock(nextPingSec)}</span>. Scan the
-                    field until then.
-                  </p>
-                </div>
-              ) : activeRunners.length > 0 ? (
-                <div className="rounded-[3px] border border-line bg-surface-2/40 px-4 py-6 text-center">
-                  <Radar className="mx-auto size-5 text-faint" />
-                  <p className="mt-3 font-display text-lg font-semibold uppercase text-ink">
-                    Ping window closed
-                  </p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                    Runner positions are hidden until the next ping in {formatClock(nextPingSec)}.
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-[3px] border border-runner/25 bg-runner/5 px-4 py-6 text-center">
-                  <CheckCheck className="mx-auto size-5 text-runner" />
-                  <p className="mt-3 font-display text-lg font-semibold uppercase text-ink">
-                    Field clear
-                  </p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                    Every active runner has been caught.
-                  </p>
-                </div>
-              )
-            ) : null}
-
-            <div className="rounded-[3px] border border-line bg-canvas/25 px-3 py-3">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
-                  <Signal className="size-3" />
-                  Signal quality
-                </span>
-                <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-runner">
-                  Nominal
-                </span>
-              </div>
-              <div className="mt-2 flex gap-1">
-                {Array.from({ length: 12 }).map((_, index) => (
-                  <span
-                    key={index}
-                    className={cn(
-                      "h-1.5 flex-1 rounded-[1px]",
-                      index < 10 ? "bg-runner/70" : "bg-line-strong",
-                    )}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="hidden pt-2 lg:block">
-              <p className="label-mono mb-2">Field log</p>
-              <div className="space-y-2">
-                <LogRow
-                  time={formatClock(Math.max(0, pingCount * settings.pingSec))}
-                  text={
-                    activeRunners[0]
-                      ? `${activeRunners[0].name} signal acquired`
-                      : "No active runner signals"
-                  }
-                  tone="runner"
-                />
-                <LogRow
-                  time={formatClock(Math.max(0, pingCount * settings.pingSec))}
-                  text={`${hunters.length} hunters in the field`}
-                  tone="hunter"
-                />
-                <LogRow
-                  time={formatClock(Math.max(0, pingCount * settings.pingSec))}
-                  text={pingCount > 0 ? "Ping cycle complete" : "Awaiting first ping"}
-                  tone="neutral"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-line bg-surface/95 p-3 safe-bottom">
-          {allCaught ? (
-            <Button
-              variant="runner"
-              size="lg"
-              full
-              onClick={() => {
-                endGame("hunters");
-                navigate("/results");
-              }}
-            >
-              <Flag className="size-4" />
-              End operation
-            </Button>
-          ) : (
-            <>
+        <div className="pointer-events-auto border-t border-line bg-surface/95 p-3 safe-bottom backdrop-blur-md">
+          <div className="mx-auto max-w-5xl">
+            {allCaught ? (
+              <Button
+                variant="runner"
+                size="lg"
+                full
+                onClick={() => {
+                  endGame("hunters");
+                  navigate("/results");
+                }}
+              >
+                <Flag className="size-4" />
+                End operation
+              </Button>
+            ) : (
               <Button
                 variant="hunter"
                 size="lg"
@@ -493,13 +323,10 @@ export function HunterPage() {
                 </span>
                 <ArrowRight className="size-4" />
               </Button>
-              <p className="mt-2 text-center font-mono text-[7px] uppercase tracking-[0.16em] text-faint">
-                {activeRunners.length} runners active
-              </p>
-            </>
-          )}
+            )}
+          </div>
         </div>
-      </aside>
+      </div>
 
       <Sheet
         open={menuOpen}
@@ -621,25 +448,30 @@ function Legend({
   );
 }
 
-function LogRow({
-  time,
-  text,
-  tone,
-}: {
-  time: string;
-  text: string;
-  tone: "runner" | "hunter" | "neutral";
-}) {
+function SignalQuality() {
   return (
-    <div className="flex items-start gap-2.5">
-      <span className="w-8 shrink-0 font-mono text-[8px] tabular text-faint">{time}</span>
-      <span
-        className={cn(
-          "mt-1 size-1 shrink-0 rounded-full",
-          tone === "runner" ? "bg-runner" : tone === "hunter" ? "bg-hunter" : "bg-line-strong",
-        )}
-      />
-      <span className="text-[10px] leading-relaxed text-muted">{text}</span>
+    <div
+      role="img"
+      aria-label="Signal quality: nominal"
+      title="Signal quality: nominal"
+      className="pointer-events-auto flex items-center gap-1.5 rounded-[2px] border border-line-strong/50 bg-surface/85 px-1.5 py-1 backdrop-blur-md"
+    >
+      <Signal className="size-2.5 text-faint" />
+      <span className="flex items-end gap-[2px]">
+        {[0, 1, 2, 3].map((index) => (
+          <span
+            key={index}
+            className={cn(
+              "w-[3px] rounded-[1px]",
+              index === 0 && "h-1",
+              index === 1 && "h-1.5",
+              index === 2 && "h-2",
+              index === 3 && "h-2.5",
+              index < 3 ? "bg-runner/80" : "bg-line-strong",
+            )}
+          />
+        ))}
+      </span>
     </div>
   );
 }

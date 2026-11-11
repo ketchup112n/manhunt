@@ -86,7 +86,7 @@ export function ZoneStatusChip({
 }
 
 /**
- * Detailed shrinking-zone card for the field intel column. Explains the
+ * Detailed shrinking-zone card for the field map column. Explains the
  * schedule and warns runners when the boundary is closing in.
  */
 export function ZonePanel({ tone = "runner" }: { tone?: "hunter" | "runner" }) {
