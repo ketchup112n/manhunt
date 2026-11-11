@@ -9,7 +9,7 @@ import type { CaughtSpot, LatLng, Player, RunnerSignal } from "@/lib/types";
 function MapControls({ home }: { home: LatLng }) {
   const map = useMap();
   return (
-    <div className="pointer-events-auto absolute bottom-4 right-5 z-[500] flex flex-col gap-1.5 lg:bottom-5">
+    <div className="pointer-events-auto absolute bottom-[calc(env(safe-area-inset-bottom)+7.5rem)] right-3 z-[500] flex flex-col gap-1.5">
       <button
         type="button"
         aria-label="Zoom in"

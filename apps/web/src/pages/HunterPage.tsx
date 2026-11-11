@@ -283,10 +283,11 @@ export function HunterPage() {
         </div>
       </div>
 
+      <div className="pointer-events-none absolute right-3 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[500]">
+        <SignalQuality />
+      </div>
+
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[420]">
-        <div className="flex justify-end px-3 pb-1.5">
-          <SignalQuality />
-        </div>
         <div className="pointer-events-auto border-t border-line bg-surface/95 p-3 safe-bottom backdrop-blur-md">
           <div className="mx-auto max-w-5xl">
             {allCaught ? (
