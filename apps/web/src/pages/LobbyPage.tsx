@@ -19,6 +19,7 @@ import {
   Settings2,
   ShieldCheck,
   Shrink,
+  Shuffle,
   Sun,
   TriangleAlert,
   UserPlus,
@@ -179,7 +180,7 @@ export function LobbyPage() {
     <div className="flex min-h-dvh flex-col">
       <TopBar backTo="/" backLabel="Home" />
 
-      <main className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 pb-24 sm:px-6 lg:pb-10">
+      <main className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 pb-32 sm:px-6 lg:pb-10">
         <div className="flex flex-col gap-4 border-b border-line py-5 sm:py-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -312,22 +313,11 @@ export function LobbyPage() {
                 <p className="text-[11px] leading-relaxed text-muted">
                   Suggested balance is <span className="text-ink">1 hunter per 3 runners</span>.
                   Teams currently field {hunters.length} hunters and {runners.length} runners.
-                  Randomizing shuffles the teams and deploys the round.
+                  <span className="block pt-1 text-faint">
+                    Randomize &amp; deploy reshuffles everyone and starts the reveal.
+                  </span>
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={deployRandomTeams}
-                disabled={!isHost || phase !== "lobby"}
-                className={cn(
-                  "shrink-0 rounded-[2px] border px-3 py-2 font-mono text-[8px] uppercase tracking-[0.14em] transition-colors",
-                  isHost && phase === "lobby"
-                    ? "border-line-strong text-runner hover:bg-runner/5"
-                    : "border-line text-faint cursor-not-allowed",
-                )}
-              >
-                Randomize &amp; deploy
-              </button>
             </div>
 
             <ActivityFeed />
@@ -413,20 +403,33 @@ export function LobbyPage() {
                   variant={you?.role === "runner" ? "runner" : "hunter"}
                   size="lg"
                   full
-                  onClick={startOperation}
-                  disabled={!canStart}
+                  onClick={deployRandomTeams}
+                  disabled={phase !== "lobby"}
                 >
-                  <Play className="size-4" />
-                  {canStart ? "Start operation" : "Assign teams to start"}
+                  <Shuffle className="size-4" />
+                  Randomize &amp; deploy
                 </Button>
+                {canStart ? (
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    full
+                    onClick={startOperation}
+                  >
+                    <Play className="size-3.5" />
+                    Start with assigned teams
+                  </Button>
+                ) : null}
                 <p className="text-center font-mono text-[8px] uppercase tracking-[0.16em] text-faint">
-                  {unassigned.length > 0
-                    ? `${unassigned.length} player${unassigned.length === 1 ? "" : "s"} still unassigned`
-                    : readyCount < players.length
-                      ? `${players.length - readyCount} player${players.length - readyCount === 1 ? "" : "s"} not ready`
-                      : canStart
-                        ? "All players ready"
-                        : "Assign at least one hunter and one runner"}
+                  {players.length < 2
+                    ? "Add at least 2 players to deploy"
+                    : unassigned.length > 0
+                      ? `${unassigned.length} player${unassigned.length === 1 ? "" : "s"} still unassigned`
+                      : readyCount < players.length
+                        ? `${players.length - readyCount} player${players.length - readyCount === 1 ? "" : "s"} not ready`
+                        : canStart
+                          ? "All players ready"
+                          : "Assign at least one hunter and one runner"}
                 </p>
               </>
             ) : (
@@ -446,16 +449,29 @@ export function LobbyPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/95 px-4 py-3 backdrop-blur-md safe-bottom lg:hidden">
         {isHost ? (
-          <Button
-            variant={you?.role === "runner" ? "runner" : "hunter"}
-            size="lg"
-            full
-            onClick={startOperation}
-            disabled={!canStart}
-          >
-            <Play className="size-4" />
-            {canStart ? "Start operation" : "Assign teams to start"}
-          </Button>
+          <div className="space-y-2">
+            <Button
+              variant={you?.role === "runner" ? "runner" : "hunter"}
+              size="lg"
+              full
+              onClick={deployRandomTeams}
+              disabled={phase !== "lobby"}
+            >
+              <Shuffle className="size-4" />
+              Randomize &amp; deploy
+            </Button>
+            {canStart ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                full
+                onClick={startOperation}
+              >
+                <Play className="size-3.5" />
+                Start with assigned teams
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <p className="py-2 text-center font-mono text-[9px] uppercase tracking-[0.16em] text-faint">
             Waiting for the host to deploy

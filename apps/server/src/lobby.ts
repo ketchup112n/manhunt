@@ -36,7 +36,7 @@ const BOT_NAMES = [
 const MAX_CODE_ATTEMPTS = 10;
 
 /** Length of the synchronized role reveal before the prep countdown. */
-export const REVEAL_SEC = 6;
+export const REVEAL_SEC = 10;
 
 export interface LobbyPlayer {
   id: string;

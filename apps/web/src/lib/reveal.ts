@@ -1,5 +1,5 @@
 /** Length of the reveal's final "you are…" hold. */
-export const REVEAL_HOLD_MS = 2000;
+export const REVEAL_HOLD_MS = 4000;
 
 export type RevealStage = "suspense" | "revealed";
 
