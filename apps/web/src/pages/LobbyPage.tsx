@@ -22,6 +22,7 @@ import {
   Shuffle,
   Sun,
   TriangleAlert,
+  UserMinus,
   UserPlus,
   Users,
   type LucideIcon,
@@ -63,11 +64,13 @@ export function LobbyPage() {
   const startGame = useGame((s) => s.startGame);
   const skipPrep = useGame((s) => s.skipPrep);
   const setReady = useGame((s) => s.setReady);
+  const kickPlayer = useGame((s) => s.kickPlayer);
   const settings = useGame((s) => s.settings);
   const prepRemainingSec = useGame((s) => s.prepRemainingSec);
   const [qrOpen, setQrOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [kickTarget, setKickTarget] = useState<Player | null>(null);
 
   const hunters = players.filter((player) => player.role === "hunter");
   const runners = players.filter((player) => player.role === "runner");
@@ -173,6 +176,13 @@ export function LobbyPage() {
       return;
     }
     startGame();
+  };
+
+  const confirmKick = () => {
+    if (!kickTarget) return;
+    kickPlayer(kickTarget.id);
+    toast(`${kickTarget.name} removed from the lobby`, { tone: "warning" });
+    setKickTarget(null);
   };
 
   return (
@@ -283,6 +293,7 @@ export function LobbyPage() {
                 players={unassigned}
                 isHost={isHost}
                 onAssignRole={assignPlayerRole}
+                onKickRequest={setKickTarget}
                 onInvite={() => setQrOpen(true)}
               />
             ) : null}
@@ -293,6 +304,7 @@ export function LobbyPage() {
                 players={hunters}
                 maxPlayers={settings.maxPlayers}
                 onAssignRole={assignPlayerRole}
+                onKickRequest={setKickTarget}
                 onAdd={() => setQrOpen(true)}
                 isHost={isHost}
               />
@@ -301,6 +313,7 @@ export function LobbyPage() {
                 players={runners}
                 maxPlayers={settings.maxPlayers}
                 onAssignRole={assignPlayerRole}
+                onKickRequest={setKickTarget}
                 onAdd={() => setQrOpen(true)}
                 isHost={isHost}
               />
@@ -514,6 +527,27 @@ export function LobbyPage() {
         </div>
       </Modal>
 
+      <Modal
+        open={Boolean(kickTarget)}
+        onClose={() => setKickTarget(null)}
+        eyebrow="Host controls"
+        title={kickTarget ? `Remove ${kickTarget.name}?` : "Remove player"}
+      >
+        <p className="text-sm leading-relaxed text-muted">
+          {kickTarget?.name ?? "This player"} will be disconnected from the
+          lobby immediately. They can only return if late joins are enabled.
+        </p>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <Button variant="secondary" onClick={() => setKickTarget(null)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirmKick}>
+            <UserMinus className="size-4" />
+            Remove
+          </Button>
+        </div>
+      </Modal>
+
       <Sheet
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -581,6 +615,7 @@ function TeamPanel({
   players,
   maxPlayers,
   onAssignRole,
+  onKickRequest,
   onAdd,
   isHost,
 }: {
@@ -588,6 +623,7 @@ function TeamPanel({
   players: Player[];
   maxPlayers: number;
   onAssignRole: (id: string, role: RoleType) => void;
+  onKickRequest: (player: Player) => void;
   onAdd: () => void;
   isHost: boolean;
 }) {
@@ -720,6 +756,17 @@ function TeamPanel({
                   : "bg-line-strong",
               )}
             />
+            {isHost && !player.isYou ? (
+              <button
+                type="button"
+                onClick={() => onKickRequest(player)}
+                aria-label={`Remove ${player.name} from the lobby`}
+                title={`Remove ${player.name} from the lobby`}
+                className="flex size-7 shrink-0 items-center justify-center rounded-[2px] border border-line text-faint transition-colors hover:border-danger/50 hover:bg-danger/10 hover:text-danger"
+              >
+                <UserMinus className="size-3.5" />
+              </button>
+            ) : null}
             {isHost && !player.isYou ? (
               <span
                 title={`Drag ${player.name} to the other team`}
@@ -882,11 +929,13 @@ function UnassignedPanel({
   players,
   isHost,
   onAssignRole,
+  onKickRequest,
   onInvite,
 }: {
   players: Player[];
   isHost: boolean;
   onAssignRole: (id: string, role: RoleType) => void;
+  onKickRequest: (player: Player) => void;
   onInvite: () => void;
 }) {
   return (
@@ -937,7 +986,7 @@ function UnassignedPanel({
               </p>
             </div>
             {isHost ? (
-              <div className="flex gap-1.5">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => onAssignRole(player.id, "hunter")}
@@ -952,6 +1001,17 @@ function UnassignedPanel({
                 >
                   Runner
                 </button>
+                {!player.isYou ? (
+                  <button
+                    type="button"
+                    onClick={() => onKickRequest(player)}
+                    aria-label={`Remove ${player.name} from the lobby`}
+                    title={`Remove ${player.name} from the lobby`}
+                    className="flex size-7 items-center justify-center rounded-[2px] border border-line text-faint transition-colors hover:border-danger/50 hover:bg-danger/10 hover:text-danger"
+                  >
+                    <UserMinus className="size-3.5" />
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>

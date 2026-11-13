@@ -122,6 +122,8 @@ export type ClientMessage =
   | { type: "updateLocation"; lat: number; lng: number; accuracyM: number }
   | { type: "submitTag"; code: string }
   | { type: "endGame"; winner: Winner }
+  | { type: "kickPlayer"; playerId: string }
+  | { type: "rematch" }
   | { type: "fillBots"; count?: number }
   | { type: "removeBots" }
   | { type: "leave" };

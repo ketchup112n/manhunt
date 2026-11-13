@@ -17,11 +17,13 @@ import {
   Shield,
   Signal,
   Siren,
+  UserMinus,
   X,
 } from "lucide-react";
 import { HunterMap } from "@/components/game/HunterMap";
 import { GpsBanner } from "@/components/game/GpsBanner";
 import { EndMatchModal } from "@/components/game/EndMatchModal";
+import { KickPlayerSheet } from "@/components/game/KickPlayerSheet";
 import { ZoneRuleNote, ZoneStatusChip } from "@/components/game/ZoneHud";
 import { RoleBadge } from "@/components/hud/RoleBadge";
 import { Button } from "@/components/ui/Button";
@@ -52,7 +54,6 @@ export function HunterPage() {
   const lastPingAgo = useGame((state) => state.lastPingAgo);
   const pingCount = useGame((state) => state.pingCount);
   const pingExpiresAt = useGame((state) => state.pingExpiresAt);
-  const endGame = useGame((state) => state.endGame);
   const phase = useGame((state) => state.phase);
   const center = useGame((state) => state.center);
   const livePosition = useGame((state) => state.livePosition);
@@ -65,6 +66,7 @@ export function HunterPage() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [tagOpen, setTagOpen] = useState(false);
   const [endMatchOpen, setEndMatchOpen] = useState(false);
+  const [kickOpen, setKickOpen] = useState(false);
   const [pingWindowOpen, setPingWindowOpen] = useState(false);
   const [tagCode, setTagCode] = useState("");
   const [flash, setFlash] = useState(false);
@@ -291,18 +293,29 @@ export function HunterPage() {
         <div className="pointer-events-auto border-t border-line bg-surface/95 p-3 safe-bottom backdrop-blur-md">
           <div className="mx-auto max-w-5xl">
             {allCaught ? (
-              <Button
-                variant="runner"
-                size="lg"
-                full
-                onClick={() => {
-                  endGame("hunters");
-                  navigate("/results");
-                }}
-              >
-                <Flag className="size-4" />
-                End operation
-              </Button>
+              you?.isHost ? (
+                <Button
+                  variant="runner"
+                  size="lg"
+                  full
+                  onClick={() => {
+                    useGame.getState().endGame("hunters");
+                    navigate("/results");
+                  }}
+                >
+                  <Flag className="size-4" />
+                  End operation
+                </Button>
+              ) : (
+                <div className="rounded-[3px] border border-line bg-surface-2/40 px-4 py-3 text-center">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink">
+                    Field clear
+                  </p>
+                  <p className="mt-1 text-[10px] leading-relaxed text-muted">
+                    The round is finishing automatically.
+                  </p>
+                </div>
+              )
             ) : (
               <Button
                 variant="hunter"
@@ -358,15 +371,29 @@ export function HunterPage() {
               }}
             />
           ) : null}
-          <MenuRow
-            icon={RefreshCcw}
-            title="Replay ping"
-            description="Broadcast runner positions now"
-            onClick={() => {
-              useGame.getState().triggerPing();
-              setMenuOpen(false);
-            }}
-          />
+          {you?.isHost ? (
+            <MenuRow
+              icon={UserMinus}
+              title="Remove a player"
+              description="Kick anyone out of this game"
+              danger
+              onClick={() => {
+                setMenuOpen(false);
+                setKickOpen(true);
+              }}
+            />
+          ) : null}
+          {you?.isHost ? (
+            <MenuRow
+              icon={RefreshCcw}
+              title="Replay ping"
+              description="Broadcast runner positions now"
+              onClick={() => {
+                useGame.getState().triggerPing();
+                setMenuOpen(false);
+              }}
+            />
+          ) : null}
           <MenuRow
             icon={LogOut}
             title="Abandon operation"
@@ -419,6 +446,7 @@ export function HunterPage() {
 
       <TagSheet open={tagOpen} onClose={() => setTagOpen(false)} tagCode={tagCode} onTagCodeChange={setTagCode} onSubmit={submitTag} />
       <EndMatchModal open={endMatchOpen} onClose={() => setEndMatchOpen(false)} />
+      <KickPlayerSheet open={kickOpen} onClose={() => setKickOpen(false)} />
     </div>
   );
 }
@@ -594,10 +622,7 @@ function TagSheet({
             <Button
               variant="runner"
               full
-              onClick={() => {
-                useGame.getState().endGame("hunters");
-                navigate("/results");
-              }}
+              onClick={() => navigate("/results")}
             >
               <Flag className="size-4" />
               View field report

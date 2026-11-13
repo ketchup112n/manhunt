@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -36,6 +37,8 @@ export function ResultsPage() {
   const pingCount = useGame((state) => state.pingCount);
   const timeLeftSec = useGame((state) => state.timeLeftSec);
   const code = useGame((state) => state.code);
+  const rematch = useGame((state) => state.rematch);
+  const isHost = players.some((player) => player.isYou && player.isHost);
   const winner = resultWinner ?? "runners";
   const runnersWin = winner === "runners";
   const runners = players.filter((player) => player.role === "runner");
@@ -45,6 +48,12 @@ export function ResultsPage() {
   const catchesDisplay = preview && caught === 0 ? (runnersWin ? 3 : runners.length) : caught;
   const survivorsDisplay = Math.max(0, runners.length - catchesDisplay);
   const pingDisplay = preview ? Math.max(pingCount, 9) : pingCount;
+
+  useEffect(() => {
+    if (phase === "lobby" && code) {
+      navigate(`/lobby/${code}`, { replace: true });
+    }
+  }, [phase, code, navigate]);
 
   const copySummary = async () => {
     try {
@@ -124,19 +133,31 @@ export function ResultsPage() {
               </div>
 
               <div className="mt-7 flex flex-col gap-2 sm:flex-row">
-                <Button
-                  variant={runnersWin ? "runner" : "hunter"}
-                  size="lg"
-                  onClick={() => navigate(`/lobby/${code}`)}
-                >
-                  <RotateCcw className="size-4" />
-                  Run it back
-                </Button>
+                {isHost ? (
+                  <Button
+                    variant={runnersWin ? "runner" : "hunter"}
+                    size="lg"
+                    onClick={rematch}
+                  >
+                    <RotateCcw className="size-4" />
+                    Run it back
+                  </Button>
+                ) : (
+                  <Button variant="secondary" size="lg" disabled>
+                    <RotateCcw className="size-4" />
+                    Waiting for host
+                  </Button>
+                )}
                 <Button variant="secondary" size="lg" onClick={copySummary}>
                   <Copy className="size-4" />
                   Copy summary
                 </Button>
               </div>
+              {!isHost ? (
+                <p className="mt-2 font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
+                  The host can restart the lobby for a rematch
+                </p>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-2 gap-2 self-end lg:self-center">

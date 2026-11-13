@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   BrowserRouter,
   Navigate,
@@ -6,8 +7,10 @@ import {
   Route,
   Routes,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
+import { Button } from "@/components/ui/Button";
 import { DevPanel } from "@/components/game/DevPanel";
 import { LocationSync } from "@/components/game/LocationSync";
 import { RoleRevealOverlay } from "@/components/game/RoleRevealOverlay";
@@ -99,6 +102,38 @@ function ScrollToTop() {
   return null;
 }
 
+/** Shown to a player the host has removed from the lobby. */
+function RemovalNotice() {
+  const notice = useGame((state) => state.removalNotice);
+  const clearRemovalNotice = useGame((state) => state.clearRemovalNotice);
+  const navigate = useNavigate();
+
+  if (!notice) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-xl border border-line-strong/60 bg-surface p-6 text-center shadow-[0_40px_120px_rgb(0_0_0/0.55)]">
+        <p className="label-mono mb-2 text-danger">Removed</p>
+        <h2 className="display text-2xl font-semibold text-ink">
+          You are out of this lobby
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted">{notice}</p>
+        <Button
+          full
+          className="mt-5"
+          onClick={() => {
+            clearRemovalNotice();
+            navigate("/", { replace: true });
+          }}
+        >
+          Return home
+        </Button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function AppShell() {
   return (
     <div className="app-field">
@@ -147,6 +182,7 @@ export function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
+        <RemovalNotice />
         <RoleRevealOverlay />
         <DevPanel />
       </BrowserRouter>

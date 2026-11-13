@@ -558,3 +558,149 @@ test("late arrivals during the reveal are dealt a role", () => {
   assert.notEqual(guest.role, "unassigned");
   assert.equal(guest.status, "active");
 });
+
+test("only the host can end the round", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const guest = lobby.addPlayer("WREN");
+  assert.ok("id" in guest);
+  lobby.handle(hostId, {
+    type: "assignRole",
+    playerId: guest.id,
+    role: "hunter",
+  });
+  deploy(lobby, hostId);
+
+  const denied = lobby.handle(guest.id, {
+    type: "endGame",
+    winner: "hunters",
+  });
+  assert.equal(denied.error, "Only the host can do that.");
+  assert.equal(lobby.phase, "active");
+
+  const allowed = lobby.handle(hostId, {
+    type: "endGame",
+    winner: "runners",
+  });
+  assert.equal(allowed.error, undefined);
+  assert.equal(lobby.phase, "ended");
+  assert.equal(lobby.resultWinner, "runners");
+});
+
+test("only the host can request a ping", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const guest = lobby.addPlayer("WREN");
+  assert.ok("id" in guest);
+  lobby.handle(hostId, {
+    type: "assignRole",
+    playerId: guest.id,
+    role: "hunter",
+  });
+  deploy(lobby, hostId);
+
+  const before = lobby.snapshotFor(hostId, false).pingCount;
+  const denied = lobby.handle(guest.id, { type: "ping" });
+  assert.equal(denied.error, "Only the host can do that.");
+  assert.equal(lobby.snapshotFor(hostId, false).pingCount, before);
+
+  const allowed = lobby.handle(hostId, { type: "ping" });
+  assert.equal(allowed.error, undefined);
+  assert.equal(lobby.snapshotFor(hostId, false).pingCount, before + 1);
+});
+
+test("tagging the last runner finishes the round automatically", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const guest = lobby.addPlayer("WREN");
+  assert.ok("id" in guest);
+  lobby.handle(hostId, {
+    type: "assignRole",
+    playerId: guest.id,
+    role: "hunter",
+  });
+  deploy(lobby, hostId);
+
+  const runner = [...lobby.players.values()].find(
+    (player) => player.role === "runner",
+  )!;
+  const result = lobby.handle(guest.id, {
+    type: "submitTag",
+    code: runner.tagCode,
+  });
+
+  assert.equal(result.tag?.result, "success");
+  assert.equal(lobby.phase, "ended");
+  assert.equal(lobby.resultWinner, "hunters");
+});
+
+test("the host can kick a player but not themselves", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const guest = lobby.addPlayer("WREN");
+  assert.ok("id" in guest);
+
+  const self = lobby.handle(hostId, {
+    type: "kickPlayer",
+    playerId: hostId,
+  });
+  assert.equal(self.error, "You cannot remove yourself.");
+
+  const denied = lobby.handle(guest.id, {
+    type: "kickPlayer",
+    playerId: hostId,
+  });
+  assert.equal(denied.error, "Only the host can do that.");
+
+  const kicked = lobby.handle(hostId, {
+    type: "kickPlayer",
+    playerId: guest.id,
+  });
+  assert.equal(kicked.error, undefined);
+  assert.equal(kicked.kickedPlayerId, guest.id);
+  assert.equal(lobby.players.has(guest.id), false);
+});
+
+test("kicking the last runner finishes an active round", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  deploy(lobby, hostId);
+  const runner = [...lobby.players.values()].find(
+    (player) => player.role === "runner",
+  )!;
+
+  const kicked = lobby.handle(hostId, {
+    type: "kickPlayer",
+    playerId: runner.id,
+  });
+
+  assert.equal(kicked.kickedPlayerId, runner.id);
+  assert.equal(lobby.phase, "ended");
+  assert.equal(lobby.resultWinner, "hunters");
+});
+
+test("the host can restart a finished round into the lobby", () => {
+  const { lobby, hostId } = lobbyWithPlayers(2);
+  const guest = lobby.addPlayer("WREN");
+  assert.ok("id" in guest);
+  lobby.handle(hostId, {
+    type: "assignRole",
+    playerId: guest.id,
+    role: "runner",
+  });
+  deploy(lobby, hostId);
+  lobby.handle(hostId, { type: "endGame", winner: "runners" });
+  assert.equal(lobby.phase, "ended");
+
+  const denied = lobby.handle(guest.id, { type: "rematch" });
+  assert.equal(denied.error, "Only the host can do that.");
+
+  const restarted = lobby.handle(hostId, { type: "rematch" });
+  assert.equal(restarted.error, undefined);
+  assert.equal(lobby.phase, "lobby");
+  assert.equal(lobby.resultWinner, null);
+  assert.equal(lobby.snapshotFor(hostId, false).revealRemainingSec, 0);
+  for (const player of lobby.players.values()) {
+    assert.equal(player.status, "active");
+    assert.equal(player.ready, false);
+    assert.equal(player.caughtAt, null);
+  }
+
+  const tooEarly = lobby.handle(hostId, { type: "rematch" });
+  assert.match(tooEarly.error ?? "", /finished round/);
+});

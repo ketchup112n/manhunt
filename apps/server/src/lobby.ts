@@ -64,6 +64,8 @@ export interface ActionResult {
   left?: boolean;
   /** No players remain, the lobby can be discarded. */
   empty?: boolean;
+  /** A player was removed by the host and their socket must be closed. */
+  kickedPlayerId?: string;
 }
 
 interface LobbyOptions {
@@ -369,6 +371,27 @@ export class Lobby {
     }
   }
 
+  /** Host restart: return the finished lobby to a fresh briefing room. */
+  private resetToLobby(): void {
+    this.phase = "lobby";
+    this.resultWinner = null;
+    this.prepEndsAt = 0;
+    this.revealEndsAt = 0;
+    this.startedAt = 0;
+    this.endsAt = 0;
+    this.nextPingAt = 0;
+    this.lastPingAt = 0;
+    this.pingExpiresAt = 0;
+    this.pingCount = 0;
+    this.pingPositions.clear();
+    this.center = null;
+    for (const player of this.players.values()) {
+      player.status = "active";
+      player.caughtAt = null;
+      player.ready = false;
+    }
+  }
+
   handle(playerId: string, message: ClientMessage): ActionResult {
     const player = this.players.get(playerId);
     if (!player) return { changed: false, error: "Player not found." };
@@ -466,9 +489,8 @@ export class Lobby {
       }
 
       case "ping": {
-        if (!player.isHost && player.role !== "hunter") {
-          return { changed: false, error: "Only hunters can request a ping." };
-        }
+        const denied = hostOnly();
+        if (denied) return denied;
         if (this.phase !== "active") {
           return { changed: false, error: "Pings only fire during an active round." };
         }
@@ -529,6 +551,10 @@ export class Lobby {
         target.status = "caught";
         target.caughtAt = spot ? { ...spot, at: Date.now() } : null;
         this.pingPositions.delete(target.id);
+        // The last live signal just went dark: the hunt is over immediately so
+        // non-host hunters never need an end-round control.
+        const stillRunning = runners.some((runner) => runner.id !== target.id);
+        if (!stillRunning) this.finish("hunters");
         return {
           changed: true,
           tag: {
@@ -540,23 +566,43 @@ export class Lobby {
       }
 
       case "endGame": {
+        const denied = hostOnly();
+        if (denied) return denied;
         if (this.phase === "ended") return { changed: false };
         if (message.winner !== "hunters" && message.winner !== "runners") {
           return { changed: false, error: "Unknown winner." };
         }
-        const fieldClear =
-          this.countRole("runner") > 0 &&
-          [...this.players.values()].every(
-            (candidate) =>
-              candidate.role !== "runner" || candidate.status === "caught",
-          );
-        const canClose =
-          player.isHost ||
-          (message.winner === "hunters" && player.role === "hunter" && fieldClear);
-        if (!canClose) {
-          return { changed: false, error: "Only the host can end the round." };
-        }
         this.finish(message.winner);
+        return { changed: true };
+      }
+
+      case "kickPlayer": {
+        const denied = hostOnly();
+        if (denied) return denied;
+        if (message.playerId === player.id) {
+          return { changed: false, error: "You cannot remove yourself." };
+        }
+        const target = this.players.get(message.playerId);
+        if (!target) return { changed: false, error: "Player not found." };
+        this.players.delete(target.id);
+        this.pingPositions.delete(target.id);
+        if (this.phase === "active") {
+          const activeRunners = [...this.players.values()].filter(
+            (candidate) =>
+              candidate.role === "runner" && candidate.status === "active",
+          );
+          if (activeRunners.length === 0) this.finish("hunters");
+        }
+        return { changed: true, kickedPlayerId: target.id };
+      }
+
+      case "rematch": {
+        const denied = hostOnly();
+        if (denied) return denied;
+        if (this.phase !== "ended") {
+          return { changed: false, error: "Only a finished round can restart." };
+        }
+        this.resetToLobby();
         return { changed: true };
       }
 

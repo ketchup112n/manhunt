@@ -347,6 +347,22 @@ wss.on("connection", (socket: WebSocket, request: IncomingMessage) => {
     if (result.error) {
       send(socket, { type: "error", message: result.error });
     }
+    if (result.kickedPlayerId) {
+      for (const [peer, peerContext] of sockets) {
+        if (
+          peerContext.lobby !== lobby ||
+          peerContext.playerId !== result.kickedPlayerId
+        ) {
+          continue;
+        }
+        send(peer, {
+          type: "error",
+          message: "The host removed you from the lobby.",
+        });
+        peer.close(4003, "Removed by host");
+        sockets.delete(peer);
+      }
+    }
     if (result.left) {
       lobby.setConnected(player.id, false);
     }

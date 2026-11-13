@@ -50,6 +50,7 @@ interface GameStore {
   session: LobbySession | null;
   connection: ConnectionState;
   connectionError: string | null;
+  removalNotice: string | null;
   bootstrapped: boolean;
   draftName: string;
   actionError: { message: string; at: number } | null;
@@ -86,6 +87,8 @@ interface GameStore {
   submitTagCode: (code: string) => void;
   resetTag: () => void;
   endGame: (winner: Winner) => void;
+  kickPlayer: (playerId: string) => void;
+  rematch: () => void;
   fillBots: (count?: number) => void;
   removeBots: () => void;
   setDeviceHeading: (heading: number) => void;
@@ -94,6 +97,7 @@ interface GameStore {
   setPositionStatus: (status: PositionStatus, error?: string | null) => void;
   resetGame: () => void;
   dismissReveal: () => void;
+  clearRemovalNotice: () => void;
   clearActionError: () => void;
 }
 
@@ -105,6 +109,7 @@ const initialState = {
   session: null as LobbySession | null,
   connection: "idle" as ConnectionState,
   connectionError: null as string | null,
+  removalNotice: null as string | null,
   bootstrapped: false,
   draftName: "",
   actionError: null as { message: string; at: number } | null,
@@ -311,6 +316,7 @@ export const useGame = create<GameStore>((set, get) => {
       session,
       connection: "connecting",
       connectionError: null,
+      removalNotice: null,
     });
 
     let next: WebSocket;
@@ -352,6 +358,19 @@ export const useGame = create<GameStore>((set, get) => {
             "That lobby is closed or the session expired. Join the lobby again.",
           players: [],
           code: "",
+        });
+        return;
+      }
+      if (event.code === 4003) {
+        writeSession(null);
+        set({
+          session: null,
+          connection: "disconnected",
+          connectionError: null,
+          removalNotice: "The host removed you from the game.",
+          players: [],
+          code: "",
+          phase: "lobby",
         });
         return;
       }
@@ -522,6 +541,18 @@ export const useGame = create<GameStore>((set, get) => {
       send({ type: "endGame", winner });
     },
 
+    kickPlayer: (playerId) => {
+      if (!send({ type: "kickPlayer", playerId })) {
+        set({ actionError: actionError("Not connected to the lobby.") });
+      }
+    },
+
+    rematch: () => {
+      if (!send({ type: "rematch" })) {
+        set({ actionError: actionError("Not connected to the lobby.") });
+      }
+    },
+
     fillBots: (count) => {
       send({ type: "fillBots", count });
     },
@@ -553,6 +584,8 @@ export const useGame = create<GameStore>((set, get) => {
     dismissReveal: () => {
       set({ revealEndsAt: 0 });
     },
+
+    clearRemovalNotice: () => set({ removalNotice: null }),
 
     clearActionError: () => set({ actionError: null }),
   };

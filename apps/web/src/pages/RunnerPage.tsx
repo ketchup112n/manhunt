@@ -15,9 +15,11 @@ import {
   RefreshCcw,
   Shield,
   Sun,
+  UserMinus,
 } from "lucide-react";
 import { EndMatchModal } from "@/components/game/EndMatchModal";
 import { GpsBanner } from "@/components/game/GpsBanner";
+import { KickPlayerSheet } from "@/components/game/KickPlayerSheet";
 import { RunnerMap } from "@/components/game/RunnerMap";
 import { useFieldMapData } from "@/components/game/useFieldMapData";
 import { ZonePanel, ZoneRuleNote, ZoneStatusChip } from "@/components/game/ZoneHud";
@@ -59,6 +61,7 @@ export function RunnerPage() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [flash, setFlash] = useState(false);
   const [endMatchOpen, setEndMatchOpen] = useState(false);
+  const [kickOpen, setKickOpen] = useState(false);
   const [pingWindowOpen, setPingWindowOpen] = useState(false);
   const previousPing = useRef(pingCount);
 
@@ -401,6 +404,18 @@ export function RunnerPage() {
           ) : null}
           {you?.isHost ? (
             <MenuRow
+              icon={UserMinus}
+              title="Remove a player"
+              description="Kick anyone out of this game"
+              danger
+              onClick={() => {
+                setMenuOpen(false);
+                setKickOpen(true);
+              }}
+            />
+          ) : null}
+          {you?.isHost ? (
+            <MenuRow
               icon={RefreshCcw}
               title="Replay ping"
               description="Broadcast every runner position now"
@@ -459,6 +474,7 @@ export function RunnerPage() {
         <ZoneRuleNote tone="runner" />
       </Modal>
       <EndMatchModal open={endMatchOpen} onClose={() => setEndMatchOpen(false)} />
+      <KickPlayerSheet open={kickOpen} onClose={() => setKickOpen(false)} />
     </div>
   );
 }
