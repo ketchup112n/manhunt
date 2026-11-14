@@ -1,14 +1,15 @@
+import { useEffect, useRef } from "react";
 import { Circle, MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
 import { LocateFixed, Minus, Plus } from "lucide-react";
-import { DEMO_CENTER, getHunterPositions } from "@/lib/geo";
 import { createPlayerMarkerIcon } from "@/components/game/playerMarker";
 import { usePreferences } from "@/store/preferences";
-import type { LatLng } from "@/lib/types";
+import { useZoneState } from "@/store/game";
+import type { CaughtSpot, LatLng, Player, RunnerSignal } from "@/lib/types";
 
 function MapControls({ home }: { home: LatLng }) {
   const map = useMap();
   return (
-    <div className="pointer-events-auto absolute bottom-4 right-5 z-[500] flex flex-col gap-1.5 lg:bottom-5">
+    <div className="pointer-events-auto absolute bottom-[calc(env(safe-area-inset-bottom)+7.5rem)] right-3 z-[500] flex flex-col gap-1.5">
       <button
         type="button"
         aria-label="Zoom in"
@@ -37,26 +38,80 @@ function MapControls({ home }: { home: LatLng }) {
   );
 }
 
+/** Pan to the device's first fix without fighting the user's pans afterwards. */
+function FollowSelf({ position }: { position: LatLng | null }) {
+  const map = useMap();
+  const followed = useRef(false);
+
+  useEffect(() => {
+    if (!position || followed.current) return;
+    followed.current = true;
+    map.flyTo([position.lat, position.lng], 16, { duration: 0.6 });
+  }, [position, map]);
+
+  return null;
+}
+
+/** Rendered when we have neither our own fix nor a server-side arena anchor. */
+function WaitingForGps() {
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-canvas/85 px-6 text-center">
+      <LocateFixed className="size-6 animate-soft-pulse text-runner" />
+      <p className="font-display text-lg font-semibold uppercase tracking-[0.04em] text-ink">
+        Waiting for GPS
+      </p>
+      <p className="max-w-xs text-[11px] leading-relaxed text-muted">
+        Allow location access so the field can place you and your squad on the
+        map. Nothing is shown until a fix arrives.
+      </p>
+    </div>
+  );
+}
+
 export function HunterMap({
+  self,
   hunters,
   runners,
+  caughtSpots,
+  center,
   playAreaM,
   pingKey,
+  heading,
 }: {
-  hunters: { id: string; name: string }[];
-  runners: { id: string; lat: number; lng: number; name: string }[];
+  self: { id: string; name: string; lat: number; lng: number; accuracyM: number } | null;
+  hunters: Player[];
+  runners: RunnerSignal[];
+  caughtSpots: CaughtSpot[];
+  center: LatLng | null;
   playAreaM: number;
   pingKey: number;
+  heading?: number | null;
 }) {
   const theme = usePreferences((state) => state.theme);
+  const zone = useZoneState();
   const boundary = theme === "dark" ? "#4fe3c1" : "#007a62";
-  const hunterPositions = getHunterPositions(hunters);
+  const radius = zone.enabled ? zone.currentRadiusM : playAreaM;
+  const shrinking = zone.enabled && zone.isShrinking;
+  const activeBoundary = shrinking ? "#ffc24b" : boundary;
+  const focus: LatLng | null = self ?? center;
+
+  if (!focus) {
+    return (
+      <div className="absolute inset-0 overflow-hidden bg-[#071011] hud-grid">
+        <WaitingForGps />
+      </div>
+    );
+  }
+
+  const teammates = hunters.filter(
+    (hunter) => hunter.id !== self?.id && hunter.position,
+  );
 
   return (
     <div className="absolute inset-0">
       <MapContainer
-        center={[DEMO_CENTER.lat, DEMO_CENTER.lng]}
-        zoom={15}
+        center={[focus.lat, focus.lng]}
+        zoom={16}
         zoomControl={false}
         attributionControl
         className="z-0 size-full"
@@ -66,24 +121,53 @@ export function HunterMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
-        <Circle
-          center={[DEMO_CENTER.lat, DEMO_CENTER.lng]}
-          radius={playAreaM}
-          pathOptions={{
-            color: boundary,
-            weight: 1,
-            opacity: 0.45,
-            dashArray: "4 9",
-            fillColor: boundary,
-            fillOpacity: 0.02,
-            interactive: false,
-          }}
-        />
-        <Marker position={[DEMO_CENTER.lat, DEMO_CENTER.lng]} icon={createPlayerMarkerIcon("self", "YOU")} />
-        {hunterPositions.map((hunter) => (
+        <FollowSelf position={self} />
+        {zone.enabled && center ? (
+          <Circle
+            center={[center.lat, center.lng]}
+            radius={zone.startRadiusM}
+            pathOptions={{
+              color: boundary,
+              weight: 1,
+              opacity: 0.25,
+              dashArray: "4 9",
+              interactive: false,
+            }}
+          />
+        ) : null}
+        {center ? (
+          <Circle
+            center={[center.lat, center.lng]}
+            radius={radius}
+            pathOptions={{
+              color: activeBoundary,
+              weight: zone.enabled ? 1.5 : 1,
+              opacity: zone.enabled ? 0.7 : 0.45,
+              dashArray: zone.enabled ? undefined : "4 9",
+              fillColor: activeBoundary,
+              fillOpacity: zone.enabled ? 0.03 : 0.02,
+              interactive: false,
+            }}
+          />
+        ) : null}
+        {caughtSpots.map((spot) => (
+          <Marker
+            key={`caught-${spot.id}`}
+            position={[spot.lat, spot.lng]}
+            icon={createPlayerMarkerIcon("caught", spot.name)}
+            zIndexOffset={-200}
+          />
+        ))}
+          {self ? (
+            <Marker
+              position={[self.lat, self.lng]}
+              icon={createPlayerMarkerIcon("self", self.name, { heading })}
+            />
+          ) : null}
+        {teammates.map((hunter) => (
           <Marker
             key={hunter.id}
-            position={[hunter.lat, hunter.lng]}
+            position={[hunter.position!.lat, hunter.position!.lng]}
             icon={createPlayerMarkerIcon("hunter", hunter.name)}
           />
         ))}
@@ -91,10 +175,10 @@ export function HunterMap({
           <Marker
             key={`${runner.id}-${pingKey}`}
             position={[runner.lat, runner.lng]}
-            icon={createPlayerMarkerIcon("runner", runner.name, true)}
+            icon={createPlayerMarkerIcon("runner", runner.name, { ping: true })}
           />
         ))}
-        <MapControls home={DEMO_CENTER} />
+        <MapControls home={focus} />
       </MapContainer>
     </div>
   );

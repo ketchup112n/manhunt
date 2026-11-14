@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   BrowserRouter,
   Navigate,
@@ -6,11 +7,15 @@ import {
   Route,
   Routes,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
-import { ToastProvider } from "@/components/ui/Toast";
+import { ToastProvider, useToast } from "@/components/ui/Toast";
+import { Button } from "@/components/ui/Button";
 import { DevPanel } from "@/components/game/DevPanel";
+import { LocationSync } from "@/components/game/LocationSync";
+import { RoleRevealOverlay } from "@/components/game/RoleRevealOverlay";
 import { usePreferences } from "@/store/preferences";
-import { useGame } from "@/store/game";
+import { useGame, useYou } from "@/store/game";
 import { HomePage } from "@/pages/HomePage";
 import { CreateLobbyPage } from "@/pages/CreateLobbyPage";
 import { JoinPage } from "@/pages/JoinPage";
@@ -21,6 +26,7 @@ import { SpectatorPage } from "@/pages/SpectatorPage";
 import { ResultsPage } from "@/pages/ResultsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import type { Role } from "@/lib/types";
 
 function ThemeSync() {
   const theme = usePreferences((state) => state.theme);
@@ -39,16 +45,53 @@ function ThemeSync() {
   return null;
 }
 
-function GameClock() {
+/** Restores the persisted lobby session and surfaces server action errors. */
+function RealtimeSync() {
+  const bootstrap = useGame((state) => state.bootstrap);
+  const actionError = useGame((state) => state.actionError);
+  const clearActionError = useGame((state) => state.clearActionError);
+  const { toast } = useToast();
+
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      const state = useGame.getState();
-      if (state.phase === "active") state.tick();
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+    bootstrap();
+  }, [bootstrap]);
+
+  useEffect(() => {
+    if (!actionError) return;
+    toast(actionError.message, { tone: "warning" });
+    clearActionError();
+  }, [actionError, clearActionError, toast]);
 
   return null;
+}
+
+function homeForRole(role: Role, code: string): string {
+  if (role === "hunter") return "/game/hunter";
+  if (role === "runner") return "/game/runner";
+  return code ? `/lobby/${code}` : "/join";
+}
+
+/**
+ * Keeps players on the screen that matches the role the host gave them.
+ * Without a session the routes stay open so the dev console can preview them.
+ */
+function RoleGate({ role, children }: { role: Role; children: ReactNode }) {
+  const you = useYou();
+  const session = useGame((state) => state.session);
+  const phase = useGame((state) => state.phase);
+  const code = useGame((state) => state.code);
+  const bootstrapped = useGame((state) => state.bootstrapped);
+
+  if (!bootstrapped) return null;
+  if (!session || !you) return <>{children}</>;
+  if (phase === "ended") return <Navigate to="/results" replace />;
+  if (phase === "lobby") {
+    return <Navigate to={code ? `/lobby/${code}` : "/join"} replace />;
+  }
+  if (you.role !== role) {
+    return <Navigate to={homeForRole(you.role, code)} replace />;
+  }
+  return <>{children}</>;
 }
 
 function ScrollToTop() {
@@ -57,6 +100,38 @@ function ScrollToTop() {
     window.scrollTo(0, 0);
   }, [pathname]);
   return null;
+}
+
+/** Shown to a player the host has removed from the lobby. */
+function RemovalNotice() {
+  const notice = useGame((state) => state.removalNotice);
+  const clearRemovalNotice = useGame((state) => state.clearRemovalNotice);
+  const navigate = useNavigate();
+
+  if (!notice) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-xl border border-line-strong/60 bg-surface p-6 text-center shadow-[0_40px_120px_rgb(0_0_0/0.55)]">
+        <p className="label-mono mb-2 text-danger">Removed</p>
+        <h2 className="display text-2xl font-semibold text-ink">
+          You are out of this lobby
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted">{notice}</p>
+        <Button
+          full
+          className="mt-5"
+          onClick={() => {
+            clearRemovalNotice();
+            navigate("/", { replace: true });
+          }}
+        >
+          Return home
+        </Button>
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 function AppShell() {
@@ -73,7 +148,8 @@ export function App() {
   return (
     <ToastProvider>
       <ThemeSync />
-      <GameClock />
+      <RealtimeSync />
+      <LocationSync />
       <BrowserRouter>
         <ScrollToTop />
         <Routes>
@@ -83,8 +159,22 @@ export function App() {
             <Route path="join" element={<JoinPage />} />
             <Route path="join/:code" element={<JoinPage />} />
             <Route path="lobby/:code" element={<LobbyPage />} />
-            <Route path="game/hunter" element={<HunterPage />} />
-            <Route path="game/runner" element={<RunnerPage />} />
+            <Route
+              path="game/hunter"
+              element={
+                <RoleGate role="hunter">
+                  <HunterPage />
+                </RoleGate>
+              }
+            />
+            <Route
+              path="game/runner"
+              element={
+                <RoleGate role="runner">
+                  <RunnerPage />
+                </RoleGate>
+              }
+            />
             <Route path="game/spectator" element={<SpectatorPage />} />
             <Route path="results" element={<ResultsPage />} />
             <Route path="settings" element={<SettingsPage />} />
@@ -92,6 +182,8 @@ export function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
+        <RemovalNotice />
+        <RoleRevealOverlay />
         <DevPanel />
       </BrowserRouter>
     </ToastProvider>

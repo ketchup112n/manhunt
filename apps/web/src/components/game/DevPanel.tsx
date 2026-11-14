@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Compass,
   Crosshair,
   Eye,
   Flag,
@@ -9,6 +8,7 @@ import {
   Home,
   LogIn,
   Moon,
+  Navigation,
   Play,
   Rabbit,
   Radio,
@@ -28,18 +28,6 @@ import { useGame, useYou } from "@/store/game";
 import { usePreferences } from "@/store/preferences";
 import { cn } from "@/lib/cn";
 
-const SCREENS: { label: string; path: string; icon: LucideIcon }[] = [
-  { label: "Home", path: "/", icon: Home },
-  { label: "Create", path: "/create", icon: SquarePlus },
-  { label: "Join", path: "/join", icon: LogIn },
-  { label: "Lobby", path: "/lobby/VX7K2M", icon: Users },
-  { label: "Hunter", path: "/game/hunter", icon: Crosshair },
-  { label: "Runner", path: "/game/runner", icon: Rabbit },
-  { label: "Spectator", path: "/game/spectator", icon: Eye },
-  { label: "Results", path: "/results", icon: Trophy },
-  { label: "Settings", path: "/settings", icon: Settings },
-];
-
 export function DevPanel() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,20 +41,31 @@ export function DevPanel() {
   const triggerPing = useGame((state) => state.triggerPing);
   const startGame = useGame((state) => state.startGame);
   const endGame = useGame((state) => state.endGame);
+  const fillBots = useGame((state) => state.fillBots);
+  const removeBots = useGame((state) => state.removeBots);
   const setDeviceHeading = useGame((state) => state.setDeviceHeading);
   const resetGame = useGame((state) => state.resetGame);
   const theme = usePreferences((state) => state.theme);
   const setTheme = usePreferences((state) => state.setTheme);
   const resetPreferences = usePreferences((state) => state.resetPreferences);
   const players = useGame((state) => state.players);
+  const code = useGame((state) => state.code);
+  const session = useGame((state) => state.session);
+  const lobbyPath = session?.code ? `/lobby/${session.code}` : "/join";
+
+  const screens: { label: string; path: string; icon: LucideIcon }[] = [
+    { label: "Home", path: "/", icon: Home },
+    { label: "Create", path: "/create", icon: SquarePlus },
+    { label: "Join", path: "/join", icon: LogIn },
+    { label: "Lobby", path: lobbyPath, icon: Users },
+    { label: "Hunter", path: "/game/hunter", icon: Crosshair },
+    { label: "Runner", path: "/game/runner", icon: Rabbit },
+    { label: "Spectator", path: "/game/spectator", icon: Eye },
+    { label: "Results", path: "/results", icon: Trophy },
+    { label: "Settings", path: "/settings", icon: Settings },
+  ];
 
   const go = (path: string) => {
-    if (
-      (path === "/game/hunter" || path === "/game/runner") &&
-      useGame.getState().phase === "lobby"
-    ) {
-      startGame();
-    }
     navigate(path);
     setOpen(false);
   };
@@ -74,14 +73,15 @@ export function DevPanel() {
   const reset = () => {
     resetGame();
     resetPreferences();
-    toast("Demo state reset", {
-      description: "Players, settings, timers and preferences restored.",
+    toast("Session reset", {
+      description: "Left the lobby and restored default preferences.",
       tone: "success",
     });
     setOpen(false);
   };
 
   const runners = players.filter((p) => p.role === "runner");
+  const bots = players.filter((p) => p.isBot);
 
   return (
     <>
@@ -118,9 +118,9 @@ export function DevPanel() {
       >
         <div className="space-y-5">
           <section>
-            <SectionLabel label="Screens" meta={`${SCREENS.length} routes`} />
+            <SectionLabel label="Screens" meta={`${screens.length} routes`} />
             <div className="grid grid-cols-3 gap-1.5">
-              {SCREENS.map((screen) => {
+              {screens.map((screen) => {
                 const active =
                   screen.path === "/"
                     ? location.pathname === "/"
@@ -189,10 +189,41 @@ export function DevPanel() {
           </section>
 
           <section>
-            <SectionLabel label="Host-assigned role" meta={you?.name ?? "ECHO"} />
+            <SectionLabel
+              label="Lobby"
+              meta={code ? `Code ${code}` : "Not connected"}
+            />
             <div className="rounded-[3px] border border-line bg-surface-2/40 p-3 font-mono text-[9px] uppercase tracking-[0.12em] text-muted">
-              Role is assigned by the host in the lobby. Use the lobby team controls
-              to move players between hunters and runners.
+              {session
+                ? "You are connected to a live lobby. Roles are assigned by the host."
+                : "Create or join a lobby to test multiplayer. Bots are available to the host."}
+            </div>
+            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+              <DevAction
+                icon={Users}
+                label="Fill with bots"
+                onClick={() => {
+                  fillBots(8);
+                  toast("Adding bots", { tone: "success" });
+                }}
+              />
+              <DevAction
+                icon={RotateCcw}
+                label={`Clear bots${bots.length ? ` (${bots.length})` : ""}`}
+                onClick={() => {
+                  removeBots();
+                  toast("Removing bots", { tone: "default" });
+                }}
+              />
+            </div>
+          </section>
+
+          <section>
+            <SectionLabel label="Host-assigned role" meta={you?.name ?? "—"} />
+            <div className="rounded-[3px] border border-line bg-surface-2/40 p-3 font-mono text-[9px] uppercase tracking-[0.12em] text-muted">
+              {you
+                ? `Current role: ${you.role}. Use the lobby team controls to move players between hunters and runners.`
+                : "Role is assigned by the host in the lobby. This screen has no active session."}
             </div>
           </section>
 
@@ -219,7 +250,7 @@ export function DevPanel() {
                     ) : null}
                   </div>
                   <span className="font-mono text-[10px] tabular tracking-[0.2em] text-ink">
-                    {runner.tagCode}
+                    {runner.tagCode ?? "••••"}
                   </span>
                 </div>
               ))}
@@ -233,8 +264,8 @@ export function DevPanel() {
             <SectionLabel label="Sensor simulation" meta={`${Math.round(deviceHeading)}°`} />
             <div className="rounded-[3px] border border-line bg-surface-2/40 px-3.5 py-3">
               <Slider
-                label="Compass heading"
-                hint="Simulates the phone pointing direction on the runner HUD."
+                label="Facing direction"
+                hint="Simulates the phone pointing direction on the field map."
                 value={deviceHeading}
                 min={0}
                 max={359}
@@ -247,8 +278,8 @@ export function DevPanel() {
               />
               <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5">
                 <span className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
-                  <Compass className="size-3" />
-                  Runner view only
+                  <Navigation className="size-3" />
+                  Runner + hunter view
                 </span>
                 <div className="flex gap-1">
                   {[0, 90, 180, 270].map((angle) => (
@@ -299,7 +330,7 @@ export function DevPanel() {
           </section>
 
           <p className="border-t border-line pt-3 font-mono text-[8px] uppercase leading-relaxed tracking-[0.12em] text-faint">
-            Dev only / no tracking / all players, pings and sensors are mock data.
+            Dev only / live lobby state / debug PINs come from the local server.
           </p>
         </div>
       </Sheet>
