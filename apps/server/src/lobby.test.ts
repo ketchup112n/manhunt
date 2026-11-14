@@ -704,3 +704,43 @@ test("the host can restart a finished round into the lobby", () => {
   const tooEarly = lobby.handle(hostId, { type: "rematch" });
   assert.match(tooEarly.error ?? "", /finished round/);
 });
+
+test("a ping exposes hunter positions to runners, frozen at ping time", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const runner = [...lobby.players.values()].find(
+    (player) => player.role === "runner",
+  )!;
+
+  movePlayer(lobby, hostId, 40.7, -74);
+  movePlayer(lobby, runner.id, 40.705, -74);
+  deploy(lobby, hostId);
+
+  const hidden = lobby.snapshotFor(runner.id, false);
+  assert.equal(
+    hidden.players.find((player) => player.id === hostId)?.position,
+    undefined,
+  );
+  assert.ok(hidden.nearestHunter);
+
+  lobby.handle(hostId, { type: "ping" });
+  const exposed = lobby.snapshotFor(runner.id, false);
+  assert.equal(
+    exposed.players.find((player) => player.id === hostId)?.position?.lat,
+    40.7,
+  );
+  assert.equal(exposed.nearestHunter, null);
+
+  movePlayer(lobby, hostId, 41, -75);
+  const frozen = lobby.snapshotFor(runner.id, false);
+  assert.equal(
+    frozen.players.find((player) => player.id === hostId)?.position?.lat,
+    40.7,
+  );
+
+  const hunterView = lobby.snapshotFor(hostId, false);
+  assert.equal(
+    hunterView.players.find((player) => player.id === runner.id)?.position
+      ?.lat,
+    40.705,
+  );
+});

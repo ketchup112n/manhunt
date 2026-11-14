@@ -10,8 +10,8 @@ const steps = [
   {
     index: "01",
     icon: Radar,
-    title: "Hunters receive pings",
-    body: "Runner coordinates are revealed at set intervals. Between pings, the hunters are blind — and the clock is against them.",
+    title: "Pings expose both sides",
+    body: "Runner coordinates are revealed at set intervals — and hunters are exposed to runners for the same window. Between pings, both sides go dark.",
     meta: "Location intelligence",
     tone: "hunter" as const,
   },
@@ -64,9 +64,10 @@ export function HomePage() {
             </h1>
 
             <p className="mt-7 max-w-md text-[15px] leading-relaxed text-muted sm:text-base">
-              A live game of hide and seek across the real world. Hunters get
-              periodic location pings. Runners get a live field map with a
-              facing arrow. The city decides the rest.
+              A live game of hide and seek across the real world. Every location
+              ping exposes both teams — hunters track runners, runners track
+              hunters. Plus a live field map with a facing arrow. The city
+              decides the rest.
             </p>
 
             <div className="mt-8 flex flex-col gap-2.5 sm:flex-row">

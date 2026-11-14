@@ -237,7 +237,7 @@ export function RoleRevealOverlay() {
                 same second.
               </p>
               <p className="mt-5 font-mono text-[8px] uppercase tracking-[0.18em] text-faint">
-                Hunters get pings / runners get a head start
+                Pings expose both sides / runners get a head start
               </p>
             </motion.div>
           ) : (

@@ -130,7 +130,7 @@ export function HunterPage() {
     if (pingCount > previousPing.current) {
       setFlash(true);
       toast("Location ping received", {
-        description: `${activeRunners.length} runner signals refreshed on the map.`,
+        description: `${activeRunners.length} runner signals refreshed — both sides are exposed for ten seconds.`,
         tone: "success",
       });
       const timer = window.setTimeout(() => setFlash(false), 2400);
@@ -387,7 +387,7 @@ export function HunterPage() {
             <MenuRow
               icon={RefreshCcw}
               title="Replay ping"
-              description="Broadcast runner positions now"
+              description="Expose both teams' positions for ten seconds"
               onClick={() => {
                 useGame.getState().triggerPing();
                 setMenuOpen(false);
@@ -433,7 +433,7 @@ export function HunterPage() {
           />
           <RuleRow
             label="Runner intel"
-            value={settings.showAllHuntersToRunners ? "All hunters visible" : "Nearest only"}
+            value={settings.showAllHuntersToRunners ? "All hunters (live)" : "Nearest + pings"}
           />
         </div>
         <p className="mt-4 border-t border-line pt-3 font-mono text-[8px] uppercase leading-relaxed tracking-[0.12em] text-faint">

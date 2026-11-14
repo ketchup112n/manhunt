@@ -109,7 +109,8 @@ export function RunnerPage() {
     if (pingCount > previousPing.current) {
       setFlash(true);
       toast("Location broadcast", {
-        description: "Hunters just received your last known position.",
+        description:
+          "Hunters got your position — and you can see their markers for ten seconds.",
         tone: "warning",
       });
       previousPing.current = pingCount;
@@ -207,11 +208,13 @@ export function RunnerPage() {
                   {recentlyLocated ? "Exposed" : "Tracking"}
                 </Chip>
                 <Chip
-                  tone={settings.showAllHuntersToRunners ? "hunter" : "runner"}
+                  tone={visibleHunters.length > 0 ? "hunter" : "runner"}
                 >
-                  {settings.showAllHuntersToRunners
-                    ? `${hunters.length} hunters visible`
-                    : "Squad view"}
+                  {visibleHunters.length > 0
+                    ? `${visibleHunters.length} hunter${visibleHunters.length === 1 ? "" : "s"} visible`
+                    : settings.showAllHuntersToRunners
+                      ? "Hunter intel on"
+                      : "Squad view"}
                 </Chip>
                 {headingStatus === "denied" || headingStatus === "pending" ? (
                   <button
@@ -253,7 +256,7 @@ export function RunnerPage() {
                 <span className="size-1.5 rounded-full bg-runner/50" />
                 Squad
               </span>
-              {settings.showAllHuntersToRunners ? (
+              {visibleHunters.length > 0 ? (
                 <span className="flex items-center gap-1.5">
                   <span className="size-1.5 rounded-full bg-hunter" />
                   Hunters
@@ -267,8 +270,10 @@ export function RunnerPage() {
 
             {!settings.showAllHuntersToRunners ? (
               <p className="border-t border-line px-4 py-2.5 font-mono text-[7px] uppercase leading-relaxed tracking-[0.12em] text-faint">
-                Only your squad and caught sites are marked. Enable all-hunter
-                intel in lobby rules to reveal anonymous hunter markers.
+                Between pings only your squad and caught sites are marked. Every
+                ping also reveals hunter positions for ten seconds. Enable
+                all-hunter intel in lobby rules to keep hunters visible all
+                round.
               </p>
             ) : null}
           </Card>
@@ -418,7 +423,7 @@ export function RunnerPage() {
             <MenuRow
               icon={RefreshCcw}
               title="Replay ping"
-              description="Broadcast every runner position now"
+              description="Expose both teams' positions for ten seconds"
               onClick={() => {
                 useGame.getState().triggerPing();
                 setMenuOpen(false);
@@ -464,7 +469,7 @@ export function RunnerPage() {
           />
           <RuleRow
             label="All-hunter intel"
-            value={settings.showAllHuntersToRunners ? "Enabled (map + list)" : "Disabled (squad only)"}
+            value={settings.showAllHuntersToRunners ? "Enabled (map + list)" : "Ping window only"}
           />
         </div>
         <p className="mt-4 border-t border-line pt-3 font-mono text-[8px] uppercase leading-relaxed tracking-[0.12em] text-faint">
@@ -574,8 +579,8 @@ function ExposureCard({
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-muted">
           Every {Math.round(pingSec / 60)} minutes, hunters receive your
-          coordinates for ten seconds. Your position is hidden again until
-          the next ping.
+          coordinates for ten seconds. During that same window you see every
+          hunter's position, then both sides go dark until the next ping.
         </p>
       </div>
     </Card>

@@ -146,7 +146,7 @@ export function SettingsEditor({ compact }: { compact?: boolean }) {
         index="02"
         title="Rules of engagement"
         summary={`${formatRadius(settings.playAreaM, units)} field · ${
-          settings.showAllHuntersToRunners ? "all hunters" : "squad only"
+          settings.showAllHuntersToRunners ? "all hunters" : "ping intel"
         }`}
         expanded={open.field}
         onToggle={() => toggle("field")}
@@ -170,7 +170,7 @@ export function SettingsEditor({ compact }: { compact?: boolean }) {
           <div className={cn("divide-y divide-line/80", compact && "space-y-2")}>
             <Toggle
               label="Show all hunters to runners"
-              description="Runners see anonymous hunter markers with bearing & distance."
+              description="Keep hunter markers visible all round instead of only during pings."
               checked={settings.showAllHuntersToRunners}
               onChange={(value) => set("showAllHuntersToRunners", value)}
               compact={compact}
@@ -487,7 +487,7 @@ export function SettingsSummary({ compact }: { compact?: boolean }) {
       icon: Users,
     },
     { label: "Field", value: formatRadius(settings.playAreaM, units), icon: Map },
-    { label: "Intel", value: settings.showAllHuntersToRunners ? "All hunters" : "Squad only", icon: Crosshair },
+    { label: "Intel", value: settings.showAllHuntersToRunners ? "All hunters" : "Ping reveals", icon: Crosshair },
     {
       label: "Zone",
       value: settings.zoneEnabled ? "Shrinking" : "Static",
@@ -528,7 +528,7 @@ export function SettingsCallout() {
       <span className="mt-1 size-1.5 shrink-0 rounded-full bg-info" />
       <p className="text-[11px] leading-relaxed text-muted">
         Runners will be located <span className="text-ink">{estimated} times</span> this round.
-        Hunters receive coordinates only at those pings.
+        Each ping exposes both teams' positions for ten seconds.
       </p>
     </div>
   );
@@ -541,7 +541,7 @@ export function RulesChips() {
       <Chip tone="hunter">Ping {Math.round(settings.pingSec / 60)}m</Chip>
       <Chip>{Math.round(settings.durationSec / 60)}m round</Chip>
       <Chip tone="runner">Private tag code</Chip>
-      <Chip>{settings.showAllHuntersToRunners ? "Hunter intel on" : "Hunter intel off"}</Chip>
+      <Chip>{settings.showAllHuntersToRunners ? "Hunter intel on" : "Ping reveals"}</Chip>
       {settings.zoneEnabled ? <Chip tone="warning">Zone shrinking</Chip> : null}
     </div>
   );

@@ -91,6 +91,7 @@ export class Lobby {
   private pingExpiresAt = 0;
   private pingCount = 0;
   private pingPositions = new Map<string, GeoPosition>();
+  private hunterPingPositions = new Map<string, GeoPosition>();
   /** Arena anchor captured at deploy time; null until a player has a fix. */
   center: LatLng | null = null;
   private botCursor = 0;
@@ -319,6 +320,7 @@ export class Lobby {
     this.pingExpiresAt = 0;
     this.pingCount = 0;
     this.pingPositions.clear();
+    this.hunterPingPositions.clear();
     if (!this.center) this.center = this.anchorFromPlayers();
     for (const player of this.players.values()) {
       player.status = "active";
@@ -327,20 +329,24 @@ export class Lobby {
     }
   }
 
-  /** Capture every active runner's fix at ping time. Hunters see this frozen snapshot. */
+  /**
+   * Capture every active runner's fix at ping time for hunters, and every
+   * hunter's fix for runners. Both sides see a frozen snapshot for the ping
+   * window, so the intel is symmetrical.
+   */
   private recordPing(now: number): void {
     this.pingCount += 1;
     this.lastPingAt = now;
     this.pingExpiresAt = now + 10_000;
     this.nextPingAt = now + Math.max(1, this.settings.pingSec) * 1000;
     this.pingPositions.clear();
+    this.hunterPingPositions.clear();
     for (const player of this.players.values()) {
-      if (
-        player.role === "runner" &&
-        player.status === "active" &&
-        player.position
-      ) {
+      if (!player.position) continue;
+      if (player.role === "runner" && player.status === "active") {
         this.pingPositions.set(player.id, { ...player.position });
+      } else if (player.role === "hunter") {
+        this.hunterPingPositions.set(player.id, { ...player.position });
       }
     }
   }
@@ -364,6 +370,7 @@ export class Lobby {
     this.resultWinner = winner;
     this.pingExpiresAt = 0;
     this.pingPositions.clear();
+    this.hunterPingPositions.clear();
     if (winner === "hunters") {
       for (const player of this.players.values()) {
         if (player.role === "runner") player.status = "caught";
@@ -384,6 +391,7 @@ export class Lobby {
     this.pingExpiresAt = 0;
     this.pingCount = 0;
     this.pingPositions.clear();
+    this.hunterPingPositions.clear();
     this.center = null;
     for (const player of this.players.values()) {
       player.status = "active";
@@ -586,6 +594,7 @@ export class Lobby {
         if (!target) return { changed: false, error: "Player not found." };
         this.players.delete(target.id);
         this.pingPositions.delete(target.id);
+        this.hunterPingPositions.delete(target.id);
         if (this.phase === "active") {
           const activeRunners = [...this.players.values()].filter(
             (candidate) =>
@@ -703,7 +712,8 @@ export class Lobby {
      * Location visibility is decided per viewer:
      * - you always see yourself;
      * - hunters see their own team and runners only inside a ping window;
-     * - runners see their squad, plus hunters only when the host enables it;
+     * - runners see their squad and hunters inside a ping window, or at all
+     *   times when the host enables all-hunter intel;
      * - caught runners and unassigned players never share a location.
      */
     const visiblePosition = (player: LobbyPlayer): GeoPosition | undefined => {
@@ -723,8 +733,9 @@ export class Lobby {
 
       if (viewerRole === "runner") {
         if (player.role === "runner") return player.position;
-        if (player.role === "hunter" && this.settings.showAllHuntersToRunners) {
-          return player.position;
+        if (player.role === "hunter") {
+          if (this.settings.showAllHuntersToRunners) return player.position;
+          if (pingOpen) return this.hunterPingPositions.get(player.id);
         }
         return undefined;
       }
@@ -751,7 +762,8 @@ export class Lobby {
     if (
       viewerRole === "runner" &&
       viewer?.position &&
-      !this.settings.showAllHuntersToRunners
+      !this.settings.showAllHuntersToRunners &&
+      !pingOpen
     ) {
       let closest: LobbyPlayer | null = null;
       let closestDistance = Number.POSITIVE_INFINITY;
