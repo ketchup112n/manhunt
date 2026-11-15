@@ -8,7 +8,7 @@ export function Logo({
   className?: string;
 }) {
   return (
-    <div className={cn("flex select-none items-center gap-3", className)}>
+    <div className={cn("flex min-w-0 select-none items-center gap-3", className)}>
       <svg
         viewBox="0 0 44 44"
         aria-hidden="true"
@@ -35,7 +35,7 @@ export function Logo({
         />
       </svg>
       <div className="min-w-0">
-        <p className="display text-[22px] font-bold leading-none text-ink">MANHUNT</p>
+        <p className="display truncate whitespace-nowrap text-[22px] font-bold leading-none text-ink">MANHUNT</p>
         {!compact ? (
           <p className="mt-1 hidden font-mono text-[8px] uppercase tracking-[0.28em] text-faint sm:block">
             Real-world pursuit

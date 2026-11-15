@@ -293,7 +293,7 @@ export function LobbyPage() {
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             {unassigned.length > 0 ? (
               <UnassignedPanel
                 players={unassigned}
@@ -341,7 +341,7 @@ export function LobbyPage() {
             <ActivityFeed />
           </div>
 
-          <aside className="space-y-3 lg:sticky lg:top-4">
+          <aside className="min-w-0 space-y-3 lg:sticky lg:top-4">
             <Card corners className="overflow-hidden">
               <div className="flex items-center justify-between gap-3 border-b border-line px-3.5 py-2.5">
                 <p className="label-mono">Mission rules</p>

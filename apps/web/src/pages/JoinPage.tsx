@@ -44,7 +44,7 @@ export function JoinPage() {
 
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 items-center px-4 py-8 sm:px-6 sm:py-12">
         <div className="grid w-full gap-8 lg:grid-cols-[1fr_420px] lg:items-center lg:gap-16">
-          <div className="animate-rise">
+          <div className="min-w-0 animate-rise">
             <div className="mb-4 flex items-center gap-2">
               <span className="h-px w-6 bg-runner" />
               <p className="label-mono text-runner">Field access</p>
@@ -144,7 +144,7 @@ export function JoinPage() {
             </form>
           </div>
 
-          <div className="relative animate-rise lg:justify-self-end">
+          <div className="relative min-w-0 animate-rise lg:justify-self-end">
             <div className="absolute -inset-4 rounded-full bg-hunter/5 blur-3xl" />
             <Card corners className="relative w-full max-w-[420px] overflow-hidden">
               <div className="flex items-center justify-between border-b border-line px-5 py-3">

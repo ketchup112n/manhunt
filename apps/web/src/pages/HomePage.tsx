@@ -39,7 +39,7 @@ export function HomePage() {
       <TopBar right={<Chip tone="runner" dot className="hidden sm:inline-flex">Realtime</Chip>} />
 
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 sm:px-6">
-        <div className="flex items-center justify-between border-y border-line/60 py-2.5 font-mono text-[8px] uppercase tracking-[0.2em] text-faint">
+        <div className="flex items-center justify-between gap-3 border-y border-line/60 py-2.5 font-mono text-[8px] uppercase tracking-[0.2em] text-faint">
           <span className="flex items-center gap-2">
             <span className="size-1.5 animate-soft-pulse rounded-full bg-runner" />
             System online
@@ -49,13 +49,13 @@ export function HomePage() {
         </div>
 
         <section className="grid flex-1 items-center gap-10 py-10 sm:py-14 lg:grid-cols-[1.08fr_0.92fr] lg:gap-12 lg:py-16">
-          <div className="animate-rise">
+          <div className="min-w-0 animate-rise">
             <div className="mb-6 flex items-center gap-3">
               <span className="h-px w-8 bg-runner" />
               <span className="label-mono text-runner">Real-world pursuit protocol</span>
             </div>
 
-            <h1 className="display text-[clamp(4.4rem,15vw,9.5rem)] font-bold leading-[0.78] tracking-[-0.025em] text-ink">
+            <h1 className="display text-[clamp(3.8rem,15vw,9.5rem)] font-bold leading-[0.78] tracking-[-0.025em] text-ink">
               Hide.
               <br />
               Run.
@@ -96,7 +96,7 @@ export function HomePage() {
             </div>
           </div>
 
-          <div className="relative animate-rise pb-2 lg:pb-0">
+          <div className="relative min-w-0 animate-rise pb-2 lg:pb-0">
             <div className="absolute left-1/2 top-0 hidden -translate-x-1/2 -translate-y-6 items-center gap-2 font-mono text-[8px] uppercase tracking-[0.22em] text-faint lg:flex">
               <Crosshair className="size-3" />
               Field preview

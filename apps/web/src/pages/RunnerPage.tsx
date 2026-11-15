@@ -196,7 +196,7 @@ export function RunnerPage() {
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_350px] lg:items-start">
-          <Card corners className="overflow-hidden">
+          <Card corners className="min-w-0 overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
               <div>
                 <p className="label-mono mb-1">Live positions</p>
@@ -279,7 +279,7 @@ export function RunnerPage() {
             ) : null}
           </Card>
 
-          <aside className="space-y-3">
+          <aside className="min-w-0 space-y-3">
             <ZonePanel tone="runner" />
 
             <ExposureCard

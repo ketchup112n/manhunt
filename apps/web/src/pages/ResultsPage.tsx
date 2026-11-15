@@ -201,7 +201,7 @@ export function ResultsPage() {
         </section>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-          <div className="space-y-5">
+          <div className="min-w-0 space-y-5">
             {phase === "ended" ? (
               <Card className="overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5">
@@ -236,20 +236,74 @@ export function ResultsPage() {
                 </span>
               </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] border-collapse text-left">
+            <div className="divide-y divide-line/60 sm:hidden">
+              {players.map((player, index) => {
+                const hunter = player.role === "hunter";
+                const caughtPlayer = player.role === "runner" && player.status === "caught";
+                const signals = hunter
+                  ? `${Math.max(0, 3 - index)} tags`
+                  : caughtPlayer
+                  ? "lost"
+                  : `${String(index + 2).padStart(2, "0")} pings`;
+                return (
+                  <div key={player.id} className="flex items-center gap-3 px-4 py-3">
+                    <span
+                      className={cn(
+                        "flex size-8 shrink-0 items-center justify-center rounded-[2px] border font-mono text-[9px]",
+                        hunter
+                          ? "border-hunter/25 bg-hunter/10 text-hunter"
+                          : "border-runner/25 bg-runner/10 text-runner",
+                      )}
+                    >
+                      {player.avatar}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate font-mono text-[10px] uppercase tracking-[0.1em] text-ink">
+                          {player.name}
+                        </span>
+                        {player.isYou ? (
+                          <Chip className="h-4 shrink-0 px-1.5 text-[7px]">You</Chip>
+                        ) : null}
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <RoleBadge role={player.role} compact />
+                        <span
+                          className={cn(
+                            "font-mono text-[9px] uppercase tracking-[0.1em]",
+                            caughtPlayer
+                              ? "text-danger"
+                              : hunter
+                              ? "text-hunter"
+                              : "text-runner",
+                          )}
+                        >
+                          {hunter ? "Active" : caughtPlayer ? "Caught" : "Survived"}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-right font-mono text-[9px] tabular text-muted">
+                      {signals}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="hidden w-full max-w-full overflow-x-auto sm:block">
+              <table className="w-full min-w-[480px] border-collapse text-left">
                 <thead>
                   <tr className="border-b border-line">
-                    <th className="px-4 py-2 font-mono text-[7px] font-medium uppercase tracking-[0.16em] text-faint">
+                    <th className="px-3 py-2 font-mono text-[7px] font-medium uppercase tracking-[0.16em] text-faint sm:px-4">
                       Display name
                     </th>
-                    <th className="px-4 py-2 font-mono text-[7px] font-medium uppercase tracking-[0.16em] text-faint">
+                    <th className="px-3 py-2 font-mono text-[7px] font-medium uppercase tracking-[0.16em] text-faint sm:px-4">
                       Side
                     </th>
-                    <th className="px-4 py-2 font-mono text-[7px] font-medium uppercase tracking-[0.16em] text-faint">
+                    <th className="px-3 py-2 font-mono text-[7px] font-medium uppercase tracking-[0.16em] text-faint sm:px-4">
                       Outcome
                     </th>
-                    <th className="px-4 py-2 text-right font-mono text-[7px] font-medium uppercase tracking-[0.16em] text-faint">
+                    <th className="px-3 py-2 text-right font-mono text-[7px] font-medium uppercase tracking-[0.16em] text-faint sm:px-4">
                       Signals
                     </th>
                   </tr>
@@ -260,7 +314,7 @@ export function ResultsPage() {
                     const caughtPlayer = player.role === "runner" && player.status === "caught";
                     return (
                       <tr key={player.id} className="border-b border-line/60 last:border-0">
-                        <td className="px-4 py-2.5">
+                        <td className="px-3 py-2.5 sm:px-4">
                           <div className="flex items-center gap-2.5">
                             <span
                               className={cn(
@@ -280,10 +334,10 @@ export function ResultsPage() {
                             ) : null}
                           </div>
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-3 py-2.5 sm:px-4">
                           <RoleBadge role={player.role} compact />
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-3 py-2.5 sm:px-4">
                           <span
                             className={cn(
                               "font-mono text-[9px] uppercase tracking-[0.1em]",
@@ -297,7 +351,7 @@ export function ResultsPage() {
                             {hunter ? "Active" : caughtPlayer ? "Caught" : "Survived"}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-right font-mono text-[9px] tabular text-muted">
+                        <td className="px-3 py-2.5 text-right font-mono text-[9px] tabular text-muted sm:px-4">
                           {hunter
                             ? `${Math.max(0, 3 - index)} tags`
                             : caughtPlayer
@@ -311,8 +365,8 @@ export function ResultsPage() {
               </table>
             </div>
 
-            <div className="flex items-center justify-between border-t border-line bg-surface-2/30 px-4 py-2.5">
-              <span className="font-mono text-[7px] uppercase tracking-[0.14em] text-faint">
+            <div className="flex items-center justify-between gap-3 border-t border-line bg-surface-2/30 px-4 py-2.5">
+              <span className="min-w-0 truncate font-mono text-[7px] uppercase tracking-[0.14em] text-faint">
                 Field report generated by the lobby server
               </span>
               <button
@@ -327,7 +381,7 @@ export function ResultsPage() {
           </Card>
           </div>
 
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <Card className="overflow-hidden">
               <div className="flex items-center justify-between border-b border-line px-4 py-3">
                 <p className="label-mono">Operation timeline</p>

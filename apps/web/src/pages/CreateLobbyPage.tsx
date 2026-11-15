@@ -67,7 +67,7 @@ export function CreateLobbyPage() {
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_350px] lg:items-start">
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Card corners className="flex items-center gap-3 px-3.5 py-2.5">
               <span className="font-mono text-[8px] uppercase tracking-[0.18em] text-faint">
                 Host
