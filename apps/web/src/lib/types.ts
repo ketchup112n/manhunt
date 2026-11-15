@@ -104,6 +104,10 @@ export interface Snapshot {
   center: LatLng | null;
   nearestHunter: { bearing: number; distanceM: number; updatedAt: number } | null;
   caughtSpots: CaughtSpot[];
+  /** Your own route during the round, only sent once the round has ended. */
+  trail: LatLng[];
+  /** Distance in metres covered along your recorded trail. */
+  distanceM: number;
 }
 
 export type TagResult =

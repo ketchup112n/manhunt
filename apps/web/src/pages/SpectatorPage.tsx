@@ -31,12 +31,17 @@ export function SpectatorPage() {
   const hunters = players.filter((p) => p.role === "hunter").length;
   const survived = Math.max(0, settings.durationSec - timeLeftSec);
   const caught = you?.role === "runner" && you.status === "caught";
+  const leaveLobby = useGame((state) => state.leaveLobby);
+  const exitToHome = () => {
+    leaveLobby();
+    navigate("/");
+  };
   const { self, teammates, hunters: hunterMarkers, caughtSpots, center } =
     useFieldMapData();
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <TopBar backTo="/" backLabel="Exit field" />
+      <TopBar backTo="/" backLabel="Exit field" onBack={exitToHome} />
 
       <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 px-4 pb-12 sm:px-6">
         <div className="mt-3 overflow-hidden rounded-xl border border-danger/25 bg-surface/75">
@@ -176,7 +181,7 @@ export function SpectatorPage() {
             Round time remaining {formatLongClock(timeLeftSec)}
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => navigate("/")}>
+            <Button variant="secondary" onClick={exitToHome}>
               <LogOut className="size-3.5" />
               Leave
             </Button>

@@ -127,6 +127,7 @@ async function handleApi(
     const body = (await readJson(request)) as {
       name?: string;
       settings?: Partial<GameSettings>;
+      center?: { lat?: number; lng?: number } | null;
     };
     const name = normalizeName(body.name ?? "");
     if (!body.name || !String(body.name).trim()) {
@@ -137,8 +138,24 @@ async function handleApi(
       json(response, 503, { error: "Lobby capacity reached. Try again later." });
       return true;
     }
+    const centerLat = Number(body.center?.lat);
+    const centerLng = Number(body.center?.lng);
+    const center =
+      Number.isFinite(centerLat) &&
+      Number.isFinite(centerLng) &&
+      centerLat >= -90 &&
+      centerLat <= 90 &&
+      centerLng >= -180 &&
+      centerLng <= 180
+        ? { lat: centerLat, lng: centerLng }
+        : null;
     const code = createLobbyCode(new Set(lobbies.keys()));
-    const lobby = new Lobby({ code, hostName: name, settings: body.settings });
+    const lobby = new Lobby({
+      code,
+      hostName: name,
+      settings: body.settings,
+      center,
+    });
     lobbies.set(code, lobby);
     touch(lobby);
     const host = lobby.host;

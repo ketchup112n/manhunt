@@ -13,6 +13,7 @@ import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { DevPanel } from "@/components/game/DevPanel";
 import { LocationSync } from "@/components/game/LocationSync";
+import { LocationGate } from "@/components/game/LocationGate";
 import { RoleRevealOverlay } from "@/components/game/RoleRevealOverlay";
 import { usePreferences } from "@/store/preferences";
 import { useGame, useYou } from "@/store/game";
@@ -183,6 +184,7 @@ export function App() {
           </Route>
         </Routes>
         <RemovalNotice />
+        <LocationGate />
         <RoleRevealOverlay />
         <DevPanel />
       </BrowserRouter>

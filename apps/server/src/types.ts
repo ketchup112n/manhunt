@@ -96,6 +96,10 @@ export interface Snapshot {
   nearestHunter: { bearing: number; distanceM: number; updatedAt: number } | null;
   /** Frozen locations where runners were tagged this round. */
   caughtSpots: CaughtSpot[];
+  /** Your own route during the round, only sent once the round has ended. */
+  trail: LatLng[];
+  /** Distance in metres covered along your recorded trail. */
+  distanceM: number;
 }
 
 export interface Session {

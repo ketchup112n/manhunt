@@ -744,3 +744,57 @@ test("a ping exposes hunter positions to runners, frozen at ping time", () => {
     40.705,
   );
 });
+
+test("trails are recorded during the round and only revealed at the end", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const runner = [...lobby.players.values()].find(
+    (player) => player.role === "runner",
+  )!;
+
+  movePlayer(lobby, runner.id, 40.7, -74);
+  deploy(lobby, hostId);
+  movePlayer(lobby, runner.id, 40.7001, -74);
+  movePlayer(lobby, runner.id, 40.7011, -74);
+
+  const midRound = lobby.snapshotFor(runner.id, false);
+  assert.equal(midRound.trail.length, 0);
+  assert.equal(midRound.distanceM, 0);
+
+  lobby.handle(hostId, { type: "endGame", winner: "runners" });
+
+  const ended = lobby.snapshotFor(runner.id, false);
+  assert.equal(ended.phase, "ended");
+  assert.ok(ended.trail.length >= 3);
+  assert.equal(ended.trail[0].lat, 40.7);
+  assert.ok(ended.distanceM > 100);
+  assert.ok(ended.distanceM < 140);
+
+  const hostView = lobby.snapshotFor(hostId, false);
+  assert.ok(hostView.trail.every((point) => point.lat >= 40.7));
+});
+
+test("the arena centre chosen at creation wins over the GPS anchor", () => {
+  const chosen = { lat: 51.5074, lng: -0.1278 };
+  const lobby = new Lobby({
+    code: "ABC123",
+    hostName: "ECHO",
+    settings: { ...DEFAULT_SETTINGS, prepSec: 0 },
+    center: chosen,
+  });
+  const host = lobby.host!;
+  lobby.addBots(2);
+  for (const player of lobby.players.values()) {
+    if (player.isBot) player.role = "runner";
+  }
+  lobby.handle(host.id, {
+    type: "assignRole",
+    playerId: host.id,
+    role: "hunter",
+  });
+
+  movePlayer(lobby, host.id, 40.7, -74);
+  deploy(lobby, host.id);
+
+  assert.deepEqual(lobby.center, chosen);
+  assert.deepEqual(lobby.snapshotFor(host.id, false).center, chosen);
+});

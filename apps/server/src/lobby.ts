@@ -37,6 +37,10 @@ const MAX_CODE_ATTEMPTS = 10;
 
 /** Length of the synchronized role reveal before the prep countdown. */
 export const REVEAL_SEC = 10;
+/** Minimum spacing between recorded trail points to keep payloads small. */
+const TRAIL_MIN_SPACING_M = 8;
+/** Hard cap on stored trail points; older points thin out once exceeded. */
+const TRAIL_MAX_POINTS = 1500;
 
 export interface LobbyPlayer {
   id: string;
@@ -54,6 +58,10 @@ export interface LobbyPlayer {
   position: GeoPosition | null;
   /** Last known location at the moment this runner was tagged. */
   caughtAt: GeoPosition | null;
+  /** Downsampled route walked during the active round. */
+  trail: LatLng[];
+  /** Metres travelled along this round's trail. */
+  distanceM: number;
 }
 
 export interface ActionResult {
@@ -72,6 +80,8 @@ interface LobbyOptions {
   code: string;
   hostName: string;
   settings?: Partial<GameSettings>;
+  /** Arena centre chosen on the create screen; falls back to a GPS anchor. */
+  center?: LatLng | null;
 }
 
 export class Lobby {
@@ -94,11 +104,23 @@ export class Lobby {
   private hunterPingPositions = new Map<string, GeoPosition>();
   /** Arena anchor captured at deploy time; null until a player has a fix. */
   center: LatLng | null = null;
+  /** Centre explicitly chosen by the host on the create screen. */
+  private configuredCenter: LatLng | null = null;
   private botCursor = 0;
 
   constructor(options: LobbyOptions) {
     this.code = options.code;
     this.settings = { ...DEFAULT_SETTINGS, ...options.settings };
+    if (
+      options.center &&
+      Number.isFinite(options.center.lat) &&
+      Number.isFinite(options.center.lng)
+    ) {
+      this.configuredCenter = {
+        lat: options.center.lat,
+        lng: options.center.lng,
+      };
+    }
     const host = this.createPlayer(options.hostName, { isHost: true });
     this.players.set(host.id, host);
   }
@@ -139,6 +161,8 @@ export class Lobby {
       lastSeen: Date.now(),
       position: null,
       caughtAt: null,
+      trail: [],
+      distanceM: 0,
     };
   }
 
@@ -298,7 +322,7 @@ export class Lobby {
   private beginReveal(now: number): void {
     this.phase = "reveal";
     this.resultWinner = null;
-    if (!this.center) this.center = this.anchorFromPlayers();
+    if (!this.center) this.ensureCenter();
     this.revealEndsAt = now + REVEAL_SEC * 1000;
     if (REVEAL_SEC <= 0) this.beginPrep(now);
   }
@@ -306,7 +330,7 @@ export class Lobby {
   private beginPrep(now: number): void {
     this.phase = "prep";
     this.resultWinner = null;
-    if (!this.center) this.center = this.anchorFromPlayers();
+    if (!this.center) this.ensureCenter();
     this.prepEndsAt = now + Math.max(0, this.settings.prepSec) * 1000;
     if (this.settings.prepSec <= 0) this.beginActive(now);
   }
@@ -321,11 +345,15 @@ export class Lobby {
     this.pingCount = 0;
     this.pingPositions.clear();
     this.hunterPingPositions.clear();
-    if (!this.center) this.center = this.anchorFromPlayers();
+    if (!this.center) this.ensureCenter();
     for (const player of this.players.values()) {
       player.status = "active";
       player.caughtAt = null;
       player.ready = true;
+      player.distanceM = 0;
+      player.trail = player.position
+        ? [{ lat: player.position.lat, lng: player.position.lng }]
+        : [];
     }
   }
 
@@ -365,6 +393,14 @@ export class Lobby {
     return null;
   }
 
+  /** Anchor the zone to the host's chosen centre when one was provided. */
+  private ensureCenter(): void {
+    if (this.center) return;
+    this.center = this.configuredCenter
+      ? { ...this.configuredCenter }
+      : this.anchorFromPlayers();
+  }
+
   private finish(winner: Winner): void {
     this.phase = "ended";
     this.resultWinner = winner;
@@ -397,6 +433,8 @@ export class Lobby {
       player.status = "active";
       player.caughtAt = null;
       player.ready = false;
+      player.trail = [];
+      player.distanceM = 0;
     }
   }
 
@@ -521,6 +559,30 @@ export class Lobby {
         ) {
           return { changed: false, error: "Invalid location fix." };
         }
+        const previous = player.position;
+        if (this.phase === "active" && player.status === "active") {
+          if (!previous) {
+            player.trail = [{ lat, lng }];
+          } else {
+            const step = distanceMeters(previous, { lat, lng });
+            if (step >= 1) {
+              player.distanceM += step;
+              const last = player.trail[player.trail.length - 1];
+              if (
+                !last ||
+                distanceMeters(last, { lat, lng }) >= TRAIL_MIN_SPACING_M
+              ) {
+                player.trail.push({ lat, lng });
+                if (player.trail.length > TRAIL_MAX_POINTS) {
+                  // Thin out older points instead of dropping the start of the route.
+                  player.trail = player.trail.filter(
+                    (_, index) => index % 2 === 0,
+                  );
+                }
+              }
+            }
+          }
+        }
         player.position = {
           lat,
           lng,
@@ -528,12 +590,11 @@ export class Lobby {
           at: Date.now(),
         };
         if (
-          !this.center &&
           (this.phase === "reveal" ||
             this.phase === "prep" ||
             this.phase === "active")
         ) {
-          this.center = { lat, lng };
+          this.ensureCenter();
         }
         return { changed: false };
       }
@@ -822,6 +883,12 @@ export class Lobby {
       center: this.center ? { ...this.center } : null,
       nearestHunter,
       caughtSpots,
+      trail:
+        phase === "ended" && viewer
+          ? viewer.trail.map((point) => ({ lat: point.lat, lng: point.lng }))
+          : [],
+      distanceM:
+        phase === "ended" && viewer ? Math.round(viewer.distanceM) : 0,
     };
   }
 }

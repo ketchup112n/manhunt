@@ -53,6 +53,7 @@ export function RunnerPage() {
   const deviceHeading = useGame((state) => state.deviceHeading);
   const phase = useGame((state) => state.phase);
   const zone = useZoneState();
+  const leaveLobby = useGame((state) => state.leaveLobby);
   const units = usePreferences((state) => state.units);
   const { self, teammates, hunters: visibleHunters, caughtSpots, center } =
     useFieldMapData();
@@ -125,7 +126,7 @@ export function RunnerPage() {
       <div className="pointer-events-none absolute inset-0 hud-grid opacity-[0.12]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_at_top,color-mix(in_srgb,var(--runner)_9%,transparent),transparent_65%)]" />
 
-      <header className="relative z-20 mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 safe-top sm:px-6">
+      <header className="relative z-20 mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 safe-top sm:px-6">
         <div className="flex min-w-0 items-center gap-2.5">
           <RoleBadge role="runner" compact />
           <div className="hidden min-w-0 sm:block">
@@ -138,7 +139,7 @@ export function RunnerPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
           <ZoneStatusChip tone="runner" />
 
           <div className="flex items-center gap-1.5 rounded-[3px] border border-line-strong/60 bg-surface/85 px-2.5 py-1.5 backdrop-blur">
@@ -433,10 +434,22 @@ export function RunnerPage() {
           <MenuRow
             icon={LogOut}
             title="Abandon operation"
-            description="Return to home without saving"
+            description="Leave the lobby and return home"
             danger
-            onClick={() => navigate("/")}
+            onClick={() => {
+              leaveLobby();
+              navigate("/");
+            }}
           />
+          <p className="mt-3 rounded-[2px] border border-line bg-surface-2/40 px-3 py-2.5 text-[10px] leading-relaxed text-muted">
+            <span className="font-mono text-[7px] uppercase tracking-[0.14em] text-faint">
+              Background tracking
+            </span>
+            <br />
+            Keep MANHUNT open and the screen on. Browsers pause GPS when you
+            switch apps; tracking resumes automatically when you return, but
+            time spent in another app is not recorded.
+          </p>
         </div>
       </Sheet>
 

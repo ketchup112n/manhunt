@@ -10,6 +10,7 @@ import {
   SettingsEditor,
   SettingsSummary,
 } from "@/components/game/SettingsEditor";
+import { ArenaPicker } from "@/components/game/ArenaPicker";
 import { useGame } from "@/store/game";
 
 export function CreateLobbyPage() {
@@ -60,8 +61,8 @@ export function CreateLobbyPage() {
             </h1>
           </div>
           <p className="hidden max-w-md text-[11px] leading-relaxed text-muted sm:block">
-            Set the rules before your friends join. Every value stays editable in
-            the lobby until the round starts.
+            Place the arena, set the rules, then invite your friends. Every value
+            stays editable in the lobby until the round starts.
           </p>
         </div>
 
@@ -96,7 +97,9 @@ export function CreateLobbyPage() {
               </Chip>
             </Card>
 
-            <SettingsEditor compact />
+            <ArenaPicker />
+
+            <SettingsEditor compact draft />
 
             <p className="font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
               Host controls: assign teams · edit rules · pause round

@@ -6,6 +6,7 @@ import {
   Copy,
   Crosshair,
   Flag,
+  Footprints,
   MapPin,
   Radar,
   RotateCcw,
@@ -20,10 +21,11 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { RoleBadge } from "@/components/hud/RoleBadge";
+import { TrailMap } from "@/components/game/TrailMap";
 import { useToast } from "@/components/ui/Toast";
 import { useGame } from "@/store/game";
 import { usePreferences } from "@/store/preferences";
-import { formatLongClock, formatRadius } from "@/lib/geo";
+import { formatDistance, formatLongClock, formatRadius } from "@/lib/geo";
 import { cn } from "@/lib/cn";
 
 export function ResultsPage() {
@@ -38,6 +40,13 @@ export function ResultsPage() {
   const timeLeftSec = useGame((state) => state.timeLeftSec);
   const code = useGame((state) => state.code);
   const rematch = useGame((state) => state.rematch);
+  const leaveLobby = useGame((state) => state.leaveLobby);
+  const trail = useGame((state) => state.trail);
+  const distanceM = useGame((state) => state.distanceM);
+  const exitToHome = () => {
+    leaveLobby();
+    navigate("/");
+  };
   const isHost = players.some((player) => player.isYou && player.isHost);
   const winner = resultWinner ?? "runners";
   const runnersWin = winner === "runners";
@@ -71,6 +80,7 @@ export function ResultsPage() {
       <TopBar
         backTo="/"
         backLabel="Exit"
+        onBack={exitToHome}
         right={
           <Chip tone={runnersWin ? "runner" : "hunter"} dot className="hidden sm:inline-flex">
             Final report
@@ -191,16 +201,40 @@ export function ResultsPage() {
         </section>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-          <Card className="overflow-hidden">
-            <div className="flex items-center justify-between border-b border-line px-4 py-3.5">
-              <div className="flex items-center gap-2">
-                <Users className="size-3.5 text-faint" />
-                <p className="label-mono">Player debrief</p>
+          <div className="space-y-5">
+            {phase === "ended" ? (
+              <Card className="overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <Footprints className="size-3.5 text-runner" />
+                    <p className="label-mono">Your route</p>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-xl tabular text-ink">
+                      {formatDistance(distanceM, units)}
+                    </span>
+                    <span className="font-mono text-[7px] uppercase tracking-[0.16em] text-faint">
+                      travelled
+                    </span>
+                  </div>
+                </div>
+                <TrailMap trail={trail} />
+                <p className="border-t border-line bg-surface-2/30 px-4 py-2.5 font-mono text-[7px] uppercase tracking-[0.14em] text-faint">
+                  Recorded from your device during the active round
+                </p>
+              </Card>
+            ) : null}
+
+            <Card className="overflow-hidden">
+              <div className="flex items-center justify-between border-b border-line px-4 py-3.5">
+                <div className="flex items-center gap-2">
+                  <Users className="size-3.5 text-faint" />
+                  <p className="label-mono">Player debrief</p>
+                </div>
+                <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
+                  {players.length} players
+                </span>
               </div>
-              <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-faint">
-                {players.length} players
-              </span>
-            </div>
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] border-collapse text-left">
@@ -291,6 +325,7 @@ export function ResultsPage() {
               </button>
             </div>
           </Card>
+          </div>
 
           <div className="space-y-3">
             <Card className="overflow-hidden">
@@ -354,7 +389,7 @@ export function ResultsPage() {
               </div>
             </Card>
 
-            <Button variant="ghost" full onClick={() => navigate("/")}>
+            <Button variant="ghost" full onClick={exitToHome}>
               <ArrowRight className="size-3.5 rotate-180" />
               Exit to home
             </Button>

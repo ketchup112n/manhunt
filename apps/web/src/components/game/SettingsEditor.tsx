@@ -37,9 +37,17 @@ import type { GameSettings } from "@/lib/types";
 
 type SectionId = "timing" | "field" | "zone" | "advanced";
 
-export function SettingsEditor({ compact }: { compact?: boolean }) {
+export function SettingsEditor({
+  compact,
+  draft,
+}: {
+  compact?: boolean;
+  /** Editing a not-yet-created lobby: change local values without a socket. */
+  draft?: boolean;
+}) {
   const settings = useGame((s) => s.settings);
   const updateSettings = useGame((s) => s.updateSettings);
+  const updateDraftSettings = useGame((s) => s.updateDraftSettings);
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     timing: true,
     field: true,
@@ -55,7 +63,9 @@ export function SettingsEditor({ compact }: { compact?: boolean }) {
 
   const set = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
     const next = { ...settings, [key]: value } as GameSettings;
-    updateSettings(normalizeZoneSettings(next));
+    const normalized = normalizeZoneSettings(next);
+    if (draft) updateDraftSettings(normalized);
+    else updateSettings(normalized);
   };
 
   const toggle = (id: SectionId) =>

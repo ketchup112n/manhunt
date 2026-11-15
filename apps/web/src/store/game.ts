@@ -36,6 +36,12 @@ export type PositionStatus =
   | "unsupported"
   | "error";
 
+export type LocationPermission =
+  | "unknown"
+  | "granted"
+  | "denied"
+  | "unsupported";
+
 interface ActionResult {
   ok: boolean;
   error?: string;
@@ -68,15 +74,24 @@ interface GameStore {
   center: LatLng | null;
   nearestHunter: { bearing: number; distanceM: number; updatedAt: number } | null;
   caughtSpots: CaughtSpot[];
+  /** Your own route this round; populated when the round ends. */
+  trail: LatLng[];
+  /** Metres travelled along the recorded trail. */
+  distanceM: number;
   livePosition: GeoPosition | null;
   positionStatus: PositionStatus;
   positionError: string | null;
+  locationPermission: LocationPermission;
+  /** Arena centre selected on the create screen before a lobby exists. */
+  draftArena: LatLng | null;
 
   bootstrap: () => void;
   createLobby: (name: string, settings: GameSettings) => Promise<ActionResult>;
   joinLobby: (code: string, name: string) => Promise<ActionResult>;
   leaveLobby: () => void;
   setDraftName: (name: string) => void;
+  setDraftArena: (center: LatLng | null) => void;
+  updateDraftSettings: (settings: Partial<GameSettings>) => void;
   updateSettings: (settings: Partial<GameSettings>) => void;
   assignPlayerRole: (id: string, role: Role) => void;
   randomizeTeams: () => void;
@@ -95,6 +110,9 @@ interface GameStore {
   updateLocation: (lat: number, lng: number, accuracyM: number) => void;
   setLivePosition: (position: GeoPosition) => void;
   setPositionStatus: (status: PositionStatus, error?: string | null) => void;
+  setLocationPermission: (permission: LocationPermission) => void;
+  /** Prompt for location access with a direct fix request; resolves when granted. */
+  requestLocationAccess: () => Promise<boolean>;
   resetGame: () => void;
   dismissReveal: () => void;
   clearRemovalNotice: () => void;
@@ -131,9 +149,13 @@ const initialState = {
     updatedAt: number;
   } | null,
   caughtSpots: [] as CaughtSpot[],
+  trail: [] as LatLng[],
+  distanceM: 0,
   livePosition: null as GeoPosition | null,
   positionStatus: "idle" as PositionStatus,
   positionError: null as string | null,
+  locationPermission: "unknown" as LocationPermission,
+  draftArena: null as LatLng | null,
 };
 
 let socket: WebSocket | null = null;
@@ -231,6 +253,46 @@ function actionError(message: string): { message: string; at: number } {
   return { message, at: Date.now() };
 }
 
+/**
+ * Clears everything that belongs to a specific lobby session. Called before
+ * joining or creating a new lobby so a previous round can never leak its
+ * phase, settings or connection state into the next one.
+ */
+function freshRoundState() {
+  return {
+    code: "",
+    phase: "lobby" as GamePhase,
+    settings: DEFAULT_SETTINGS,
+    players: [] as Player[],
+    connection: "idle" as ConnectionState,
+    connectionError: null as string | null,
+    removalNotice: null as string | null,
+    actionError: null as { message: string; at: number } | null,
+    timeLeftSec: DEFAULT_SETTINGS.durationSec,
+    revealEndsAt: 0,
+    prepRemainingSec: 0,
+    nextPingSec: DEFAULT_SETTINGS.pingSec,
+    lastPingAgo: 0,
+    pingCount: 0,
+    pingExpiresAt: 0,
+    tagState: "idle" as TagState,
+    tagTargetId: null as string | null,
+    resultWinner: null as Winner | null,
+    center: null as LatLng | null,
+    nearestHunter: null as {
+      bearing: number;
+      distanceM: number;
+      updatedAt: number;
+    } | null,
+    caughtSpots: [] as CaughtSpot[],
+    trail: [] as LatLng[],
+    distanceM: 0,
+    livePosition: null as GeoPosition | null,
+    positionStatus: "idle" as PositionStatus,
+    positionError: null as string | null,
+  };
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
@@ -276,6 +338,8 @@ export const useGame = create<GameStore>((set, get) => {
       center: state.center,
       nearestHunter: state.nearestHunter,
       caughtSpots: state.caughtSpots,
+      trail: state.trail,
+      distanceM: state.distanceM,
       connection: "connected",
       connectionError: null,
     });
@@ -418,16 +482,23 @@ export const useGame = create<GameStore>((set, get) => {
       const cleanName = name.trim();
       if (!cleanName) return { ok: false, error: "Add a display name first." };
       try {
+        const store = get();
+        const center = store.draftArena
+          ? store.draftArena
+          : store.livePosition
+            ? { lat: store.livePosition.lat, lng: store.livePosition.lng }
+            : null;
         const session = await post<LobbySession>("/api/lobbies", {
           name: cleanName,
           settings,
+          center,
         });
         writeSession(session);
         writeName(cleanName.toUpperCase().slice(0, 12));
         set({
+          ...freshRoundState(),
           draftName: cleanName.toUpperCase().slice(0, 12),
-          tagState: "idle",
-          tagTargetId: null,
+          settings,
         });
         connect(session);
         return { ok: true, code: session.code };
@@ -457,9 +528,8 @@ export const useGame = create<GameStore>((set, get) => {
         writeSession(session);
         writeName(cleanName.toUpperCase().slice(0, 12));
         set({
+          ...freshRoundState(),
           draftName: cleanName.toUpperCase().slice(0, 12),
-          tagState: "idle",
-          tagTargetId: null,
         });
         connect(session);
         return { ok: true, code: session.code };
@@ -480,6 +550,7 @@ export const useGame = create<GameStore>((set, get) => {
       set({
         ...initialState,
         draftName: get().draftName,
+        locationPermission: get().locationPermission,
         bootstrapped: true,
       });
     },
@@ -490,9 +561,23 @@ export const useGame = create<GameStore>((set, get) => {
       set({ draftName: clean });
     },
 
+    setDraftArena: (center) => {
+      set({ draftArena: center });
+    },
+
     updateSettings: (settings) => {
       set((state) => ({ settings: { ...state.settings, ...settings } }));
-      if (get().session) send({ type: "updateSettings", settings });
+      // Only forward live edits to a lobby that is still accepting rule
+      // changes. A stale session from a previous round must never receive
+      // them, otherwise the server rejects the edit and the next lobby looks
+      // locked before it has even started.
+      if (get().session && get().phase === "lobby") {
+        send({ type: "updateSettings", settings });
+      }
+    },
+
+    updateDraftSettings: (settings) => {
+      set((state) => ({ settings: { ...state.settings, ...settings } }));
     },
 
     assignPlayerRole: (id, role) => {
@@ -576,6 +661,52 @@ export const useGame = create<GameStore>((set, get) => {
 
     setPositionStatus: (positionStatus, positionError = null) =>
       set({ positionStatus, positionError }),
+
+    setLocationPermission: (locationPermission) =>
+      set({ locationPermission }),
+
+    requestLocationAccess: () => {
+      if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+        set({
+          locationPermission: "unsupported",
+          positionStatus: "unsupported",
+          positionError: "This browser does not support location access.",
+        });
+        return Promise.resolve(false);
+      }
+      set({ positionStatus: "requesting", positionError: null });
+      return new Promise<boolean>((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (fix) => {
+            const position = {
+              lat: fix.coords.latitude,
+              lng: fix.coords.longitude,
+              accuracyM: Math.round(fix.coords.accuracy),
+              at: fix.timestamp || Date.now(),
+            };
+            set({
+              locationPermission: "granted",
+              livePosition: position,
+              positionStatus: "live",
+              positionError: null,
+            });
+            resolve(true);
+          },
+          (error) => {
+            const denied = error.code === error.PERMISSION_DENIED;
+            set({
+              locationPermission: denied ? "denied" : get().locationPermission,
+              positionStatus: denied ? "denied" : "error",
+              positionError: denied
+                ? "Location permission is blocked. Allow it in your browser settings to appear on the map."
+                : "No GPS fix yet. Move into the open and keep the screen on.",
+            });
+            resolve(false);
+          },
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 15_000 },
+        );
+      });
+    },
 
     resetGame: () => {
       get().leaveLobby();

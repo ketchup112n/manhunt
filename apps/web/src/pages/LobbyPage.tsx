@@ -65,6 +65,7 @@ export function LobbyPage() {
   const skipPrep = useGame((s) => s.skipPrep);
   const setReady = useGame((s) => s.setReady);
   const kickPlayer = useGame((s) => s.kickPlayer);
+  const leaveLobby = useGame((s) => s.leaveLobby);
   const settings = useGame((s) => s.settings);
   const prepRemainingSec = useGame((s) => s.prepRemainingSec);
   const [qrOpen, setQrOpen] = useState(false);
@@ -185,9 +186,14 @@ export function LobbyPage() {
     setKickTarget(null);
   };
 
+  const exitLobby = () => {
+    leaveLobby();
+    navigate("/");
+  };
+
   return (
     <div className="flex min-h-dvh flex-col">
-      <TopBar backTo="/" backLabel="Home" />
+      <TopBar backTo="/" backLabel="Home" onBack={exitLobby} />
 
       <main className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 pb-32 sm:px-6 lg:pb-10">
         <div className="flex flex-col gap-4 border-b border-line py-5 sm:py-6 lg:flex-row lg:items-end lg:justify-between">
