@@ -3,12 +3,24 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "apps/server"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "dev": "npm run dev -w @manhunt/web",
-    "build": "npm run build -w @manhunt/web",
+    "dev": "concurrently -n server,web -c cyan,magenta \"npm run dev -w @manhunt/server\" \"npm run dev -w @manhunt/web\"",
+    "dev:web": "npm run dev -w @manhunt/web",
+    "dev:server": "npm run dev -w @manhunt/server",
+    "start": "npm run start -w @manhunt/server",
+    "preview": "npm run preview -w @manhunt/web",
+    "build": "npm run build -w @manhunt/web && npm run typecheck -w @manhunt/server",
     "lint": "npm run lint -w @manhunt/web",
-    "typecheck": "npm run typecheck -w @manhunt/web"
+    "typecheck": "npm run typecheck -w @manhunt/web && npm run typecheck -w @manhunt/server",
+    "test": "npm run test -w @manhunt/web && npm run test -w @manhunt/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

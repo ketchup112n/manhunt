@@ -557,6 +557,49 @@ input[type="range"].hud-range::-moz-range-thumb {
   color: var(--runner);
 }
 
+.player-marker--caught .player-marker__avatar {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 24%, var(--surface));
+  color: var(--danger);
+  font-size: 13px;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--danger) 68%, transparent),
+    0 4px 14px rgb(0 0 0 / 0.55),
+    0 0 22px color-mix(in srgb, var(--danger) 28%, transparent);
+}
+
+.player-marker--caught .player-marker__label {
+  color: var(--danger);
+}
+
+.player-marker__heading {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  z-index: 4;
+  width: 48px;
+  height: 48px;
+  pointer-events: none;
+  color: var(--runner);
+  transform: translate(-50%, -50%) rotate(var(--heading, 0deg));
+  transform-origin: 50% 50%;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--runner) 70%, transparent));
+}
+
+.player-marker__heading svg {
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  display: block;
+  width: 11px;
+  height: 11px;
+  transform: translateX(-50%);
+  fill: currentColor;
+  stroke: color-mix(in srgb, var(--canvas) 80%, transparent);
+  stroke-width: 0.75;
+  paint-order: stroke fill;
+}
+
 .player-marker__ping {
   position: absolute;
   top: -5px;
