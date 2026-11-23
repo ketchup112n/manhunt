@@ -2,10 +2,10 @@ import {
   CircleMarker,
   MapContainer,
   Polyline,
-  TileLayer,
 } from "react-leaflet";
 import { latLngBounds, type LatLngBoundsExpression } from "leaflet";
 import { usePreferences } from "@/store/preferences";
+import { MapTileLayer } from "@/components/game/MapTileLayer";
 import { cn } from "@/lib/cn";
 import type { LatLng } from "@/lib/types";
 
@@ -58,11 +58,9 @@ export function TrailMap({
         attributionControl
         className="z-0 h-full w-full"
         scrollWheelZoom
+        maxZoom={18}
       >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        />
+        <MapTileLayer />
         {trail.length > 1 ? (
           <Polyline
             positions={positions}

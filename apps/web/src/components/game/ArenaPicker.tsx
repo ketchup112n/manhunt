@@ -4,7 +4,6 @@ import {
   Circle,
   MapContainer,
   Marker,
-  TileLayer,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -14,6 +13,7 @@ import { useGame } from "@/store/game";
 import { usePreferences } from "@/store/preferences";
 import { formatRadius } from "@/lib/geo";
 import { normalizeZoneSettings } from "@/lib/zone";
+import { MapTileLayer } from "@/components/game/MapTileLayer";
 import type { LatLng } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -120,11 +120,9 @@ export function ArenaPicker() {
             attributionControl
             className="z-0 h-full w-full"
             scrollWheelZoom
+            maxZoom={18}
           >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            />
+            <MapTileLayer />
             <Recenter center={center} />
             <MapClickPicker onPick={setDraftArena} />
             <Circle

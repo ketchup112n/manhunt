@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
-import { Circle, MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
+import { Circle, MapContainer, Marker, useMap } from "react-leaflet";
 import { LocateFixed, Minus, Plus } from "lucide-react";
 import { createPlayerMarkerIcon } from "@/components/game/playerMarker";
 import { usePreferences } from "@/store/preferences";
 import { useZoneState } from "@/store/game";
+import { MapTileLayer } from "@/components/game/MapTileLayer";
 import type { CaughtSpot, LatLng, Player, RunnerSignal } from "@/lib/types";
 
 function MapControls({ home }: { home: LatLng }) {
@@ -116,11 +117,9 @@ export function HunterMap({
         attributionControl
         className="z-0 size-full"
         scrollWheelZoom
+        maxZoom={18}
       >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        />
+        <MapTileLayer />
         <FollowSelf position={self} />
         {zone.enabled && center ? (
           <Circle
