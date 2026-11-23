@@ -133,7 +133,7 @@ export function DevPanel() {
       </button>
 
       {codePrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -150,7 +150,7 @@ export function DevPanel() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}
-            className="relative z-10 w-full max-w-xs rounded-[4px] border border-line-strong/60 bg-surface shadow-[0_40px_120px_rgb(0_0_0/0.55)]"
+            className="relative z-10 w-full max-w-xs mx-auto rounded-[4px] border border-line-strong/60 bg-surface shadow-[0_40px_120px_rgb(0_0_0/0.55)]"
           >
             <div className="flex items-start justify-between gap-4 px-5 pb-4 pt-4 sm:pt-6">
               <div>
@@ -172,7 +172,7 @@ export function DevPanel() {
               </button>
             </div>
             <div className="px-5 pt-4 pb-5">
-              <div className="mt-4 flex items-center gap-2">
+              <div className="mt-4 flex items-center gap-2 min-w-0">
                 <input
                   type="text"
                   value={enteredCode}
@@ -184,7 +184,7 @@ export function DevPanel() {
                   maxLength={4}
                   autoFocus
                   placeholder="••••"
-                  className="flex-1 text-center font-mono text-xl tracking-[0.6em] border border-line bg-surface px-3 py-2 rounded-[3px] text-ink caret-ink"
+                  className="min-w-0 flex-1 text-center font-mono text-xl tracking-[0.6em] border border-line bg-surface px-3 py-2 rounded-[3px] text-ink caret-ink"
                 />
                 <button
                   type="button"
