@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Crosshair,
@@ -18,8 +18,10 @@ import {
   Sun,
   Trophy,
   Users,
+  X,
   type LucideIcon,
 } from "lucide-react";
+import { motion } from "motion/react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { Slider } from "@/components/ui/FormControls";
@@ -35,6 +37,18 @@ export function DevPanel() {
   const [open, setOpen] = useState(false);
   const [codePrompt, setCodePrompt] = useState(false);
   const [enteredCode, setEnteredCode] = useState("");
+
+  useEffect(() => {
+    if (!codePrompt) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setCodePrompt(false);
+        setEnteredCode("");
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [codePrompt]);
 
   const you = useYou();
   const phase = useGame((state) => state.phase);
@@ -87,7 +101,10 @@ export function DevPanel() {
   const runners = players.filter((p) => p.role === "runner");
   const bots = players.filter((p) => p.isBot);
 
-  const handleOpen = () => setCodePrompt(true);
+  const handleOpen = () => {
+    setEnteredCode("");
+    setCodePrompt(true);
+  };
 
   const handleCodeSubmit = () => {
     if (enteredCode === DEMO_CODE) {
@@ -106,7 +123,7 @@ export function DevPanel() {
         type="button"
         onClick={handleOpen}
         aria-label="Open demo controls"
-        aria-expanded={open}
+        aria-expanded={open || codePrompt}
         className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-1.5 rounded-l-[3px] border border-r-0 border-runner/30 bg-surface/85 px-1.5 py-2.5 text-runner/70 shadow-[0_8px_30px_rgb(0_0_0/0.28)] backdrop-blur-md transition-colors hover:bg-surface hover:text-runner"
       >
         <FlaskConical className="size-3" />
@@ -116,52 +133,73 @@ export function DevPanel() {
       </button>
 
       {codePrompt && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => {
-            setCodePrompt(false);
-            setEnteredCode("");
-          }}
-        >
-          <div
-            className="relative w-full max-w-xs rounded-[4px] border border-line bg-surface p-6 shadow-[0_16px_48px_rgb(0_0_0/0.45)]"
-            onClick={(e) => e.stopPropagation()}
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+            onClick={() => {
+              setCodePrompt(false);
+              setEnteredCode("");
+            }}
+          />
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}
+            className="relative z-10 w-full max-w-xs rounded-[4px] border border-line-strong/60 bg-surface shadow-[0_40px_120px_rgb(0_0_0/0.55)]"
           >
-            <p className="label-mono">Demo console</p>
-            <p className="mt-2 text-[11px] text-muted">
-              Enter the access code to use prototype controls.
-            </p>
-            <div className="mt-4 flex items-center gap-2">
-              <input
-                type="password"
-                value={enteredCode}
-                onChange={(e) => setEnteredCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                onKeyDown={(e) => e.key === "Enter" && handleCodeSubmit()}
-                inputMode="numeric"
-                maxLength={4}
-                autoFocus
-                placeholder="••••"
-                className="flex-1 text-center font-mono text-xl tracking-[0.5em] border border-line bg-surface px-3 py-2 rounded-[3px] text-ink placeholder:text-faint"
-              />
+            <div className="flex items-start justify-between gap-4 px-5 pb-4 pt-4 sm:pt-6">
+              <div>
+                <p className="label-mono">Demo console</p>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted">
+                  Enter the access code to use prototype controls.
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={handleCodeSubmit}
-                className="flex size-9 items-center justify-center rounded-[3px] border border-runner/30 bg-runner/10 text-runner font-mono text-[9px] uppercase tracking-[0.12em] hover:bg-runner/20 transition-colors"
+                onClick={() => {
+                  setCodePrompt(false);
+                  setEnteredCode("");
+                }}
+                aria-label="Close"
+                className="flex size-8 shrink-0 items-center justify-center rounded-[2px] text-faint transition-colors hover:bg-surface-2 hover:text-ink"
               >
-                Unlock
+                <X className="size-4" />
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setCodePrompt(false);
-                setEnteredCode("");
-              }}
-              className="mt-3 w-full font-mono text-[9px] uppercase tracking-[0.12em] text-faint hover:text-muted"
-            >
-              Cancel
-            </button>
-          </div>
+            <div className="px-5 pt-4 pb-5">
+              <div className="mt-4 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={enteredCode}
+                  onChange={(e) =>
+                    setEnteredCode(e.target.value.replace(/\D/g, "").slice(0, 4))
+                  }
+                  onKeyDown={(e) => e.key === "Enter" && handleCodeSubmit()}
+                  inputMode="numeric"
+                  maxLength={4}
+                  autoFocus
+                  placeholder="••••"
+                  className="flex-1 text-center font-mono text-xl tracking-[0.6em] border border-line bg-surface px-3 py-2 rounded-[3px] text-ink caret-ink"
+                />
+                <button
+                  type="button"
+                  onClick={handleCodeSubmit}
+                  disabled={enteredCode.length !== 4}
+                  className="flex size-9 shrink-0 items-center justify-center rounded-[3px] border border-runner/30 bg-runner/10 text-runner font-mono text-[9px] uppercase tracking-[0.12em] hover:bg-runner/20 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  Unlock
+                </button>
+              </div>
+              <p className="mt-3 w-full font-mono text-[9px] uppercase tracking-[0.12em] text-faint">
+                Wrong code clears the field.
+              </p>
+            </div>
+          </motion.div>
         </div>
       )}
 
