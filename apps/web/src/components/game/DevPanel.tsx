@@ -33,6 +33,8 @@ export function DevPanel() {
   const location = useLocation();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [codePrompt, setCodePrompt] = useState(false);
+  const [enteredCode, setEnteredCode] = useState("");
 
   const you = useYou();
   const phase = useGame((state) => state.phase);
@@ -52,6 +54,8 @@ export function DevPanel() {
   const code = useGame((state) => state.code);
   const session = useGame((state) => state.session);
   const lobbyPath = session?.code ? `/lobby/${session.code}` : "/join";
+
+  const DEMO_CODE = "1905";
 
   const screens: { label: string; path: string; icon: LucideIcon }[] = [
     { label: "Home", path: "/", icon: Home },
@@ -83,11 +87,24 @@ export function DevPanel() {
   const runners = players.filter((p) => p.role === "runner");
   const bots = players.filter((p) => p.isBot);
 
+  const handleOpen = () => setCodePrompt(true);
+
+  const handleCodeSubmit = () => {
+    if (enteredCode === DEMO_CODE) {
+      setCodePrompt(false);
+      setEnteredCode("");
+      setOpen(true);
+    } else {
+      toast("Invalid code", { tone: "danger" });
+      setEnteredCode("");
+    }
+  };
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         aria-label="Open demo controls"
         aria-expanded={open}
         className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-1.5 rounded-l-[3px] border border-r-0 border-runner/30 bg-surface/85 px-1.5 py-2.5 text-runner/70 shadow-[0_8px_30px_rgb(0_0_0/0.28)] backdrop-blur-md transition-colors hover:bg-surface hover:text-runner"
@@ -97,6 +114,56 @@ export function DevPanel() {
           Demo
         </span>
       </button>
+
+      {codePrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => {
+            setCodePrompt(false);
+            setEnteredCode("");
+          }}
+        >
+          <div
+            className="relative w-full max-w-xs rounded-[4px] border border-line bg-surface p-6 shadow-[0_16px_48px_rgb(0_0_0/0.45)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="label-mono">Demo console</p>
+            <p className="mt-2 text-[11px] text-muted">
+              Enter the access code to use prototype controls.
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+              <input
+                type="password"
+                value={enteredCode}
+                onChange={(e) => setEnteredCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                onKeyDown={(e) => e.key === "Enter" && handleCodeSubmit()}
+                inputMode="numeric"
+                maxLength={4}
+                autoFocus
+                placeholder="••••"
+                className="flex-1 text-center font-mono text-xl tracking-[0.5em] border border-line bg-surface px-3 py-2 rounded-[3px] text-ink placeholder:text-faint"
+              />
+              <button
+                type="button"
+                onClick={handleCodeSubmit}
+                className="flex size-9 items-center justify-center rounded-[3px] border border-runner/30 bg-runner/10 text-runner font-mono text-[9px] uppercase tracking-[0.12em] hover:bg-runner/20 transition-colors"
+              >
+                Unlock
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setCodePrompt(false);
+                setEnteredCode("");
+              }}
+              className="mt-3 w-full font-mono text-[9px] uppercase tracking-[0.12em] text-faint hover:text-muted"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <Sheet
         open={open}

@@ -14,6 +14,7 @@ import {
   type Winner,
 } from "./types.ts";
 import { currentZoneRadiusM } from "./zone.ts";
+import { hunterCountFor } from "./teams.ts";
 
 const BOT_NAMES = [
   "LYNX",
@@ -195,12 +196,13 @@ export class Lobby {
     return player;
   }
 
-  /** Smaller team, coin-flip when the teams are even. */
+  /** Assigns the role that keeps the team closest to the target ratio. */
   private openRole(): Role {
-    const hunters = this.countRole("hunter");
-    const runners = this.countRole("runner");
-    if (hunters === runners) return Math.random() < 0.5 ? "hunter" : "runner";
-    return hunters < runners ? "hunter" : "runner";
+    const total = this.players.size;
+    const targetHunters = hunterCountFor(total);
+    const currentHunters = this.countRole("hunter");
+    if (currentHunters < targetHunters) return "hunter";
+    return "runner";
   }
 
   addBots(rawCount = 8): number {
@@ -724,10 +726,7 @@ export class Lobby {
       const swap = Math.floor(Math.random() * (index + 1));
       [shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
     }
-    const hunterCount = Math.max(
-      1,
-      Math.floor(Math.random() * (players.length - 1)) + 1,
-    );
+    const hunterCount = hunterCountFor(players.length);
     const hunterIds = new Set(
       shuffled.slice(0, hunterCount).map((player) => player.id),
     );

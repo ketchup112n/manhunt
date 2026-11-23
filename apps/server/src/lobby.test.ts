@@ -605,6 +605,65 @@ test("randomize teams deploys straight into the reveal", () => {
   assert.equal(lobby.snapshotFor(hostId, false).revealRemainingSec, 0);
 });
 
+test("random teams follow 1 hunter per 3 runners with minimum 2", () => {
+  const sizes = [3, 5, 8, 9, 12, 13, 16, 17, 20];
+  for (const size of sizes) {
+    const lobby = new Lobby({ code: `TST${size}`, hostName: "ECHO", settings: { prepSec: 0 } });
+    lobby.addBots(size - 1);
+    lobby.handle(lobby.hostId, { type: "randomizeTeams" });
+    const hunters = [...lobby.players.values()].filter((p) => p.role === "hunter").length;
+    const runners = [...lobby.players.values()].filter((p) => p.role === "runner").length;
+    assert.equal(hunters + runners, size);
+    assert.ok(hunters >= 1);
+    assert.ok(runners >= 1);
+    if (size >= 3) assert.ok(hunters >= 2);
+  }
+});
+
+test("random teams vary membership but keep the same count", () => {
+  const counts = new Set<number>();
+  const hunterSets = new Set<string>();
+  for (let i = 0; i < 10; i += 1) {
+    const lobby = new Lobby({ code: `RND${i}`, hostName: "ECHO", settings: { prepSec: 0 } });
+    lobby.addBots(11);
+    lobby.handle(lobby.hostId, { type: "randomizeTeams" });
+    const hunters = [...lobby.players.values()].filter((p) => p.role === "hunter");
+    counts.add(hunters.length);
+    hunterSets.add(hunters.map((p) => p.name).sort().join(","));
+  }
+  assert.equal(counts.size, 1);
+  assert.ok(hunterSets.size > 1, "different players should be picked as hunters");
+});
+
+test("late joiners during reveal follow the target ratio", () => {
+  const { lobby, hostId } = lobbyWithPlayers(7);
+  lobby.handle(hostId, { type: "randomizeTeams" });
+  assert.equal(
+    [...lobby.players.values()].filter((p) => p.role === "hunter").length,
+    2,
+  );
+
+  const guest9 = lobby.addPlayer("NINE");
+  assert.ok("role" in guest9);
+  assert.equal((guest9 as { role: string }).role, "hunter");
+
+  const guest10 = lobby.addPlayer("TEN");
+  assert.ok("role" in guest10);
+  assert.equal((guest10 as { role: string }).role, "runner");
+
+  const guest11 = lobby.addPlayer("ELEVEN");
+  assert.ok("role" in guest11);
+  assert.equal((guest11 as { role: string }).role, "runner");
+
+  const guest12 = lobby.addPlayer("TWELVE");
+  assert.ok("role" in guest12);
+  assert.equal((guest12 as { role: string }).role, "runner");
+
+  const guest13 = lobby.addPlayer("THIRTEEN");
+  assert.ok("role" in guest13);
+  assert.equal((guest13 as { role: string }).role, "hunter");
+});
+
 test("the reveal hands over to the prep countdown", () => {
   const lobby = new Lobby({
     code: "PREP12",

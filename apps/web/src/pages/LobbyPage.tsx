@@ -329,7 +329,7 @@ export function LobbyPage() {
               <div className="flex items-start gap-2.5">
                 <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-info" />
                 <p className="text-[11px] leading-relaxed text-muted">
-                  Suggested balance is <span className="text-ink">1 hunter per 3 runners</span>.
+                  Random teams use <span className="text-ink">1 hunter per 3 runners</span>, minimum 2.
                   Teams currently field {hunters.length} hunters and {runners.length} runners.
                   <span className="block pt-1 text-faint">
                     Randomize &amp; deploy reshuffles everyone and starts the reveal.

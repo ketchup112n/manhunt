@@ -144,6 +144,21 @@ Make sure the platform forwards WebSocket upgrades to the same port.
 7. A hunter asks a caught runner for their four-digit PIN and enters it. The server validates the PIN, marks the runner caught, freezes a catch marker at their last fix, and moves them to spectator mode.
 8. The round ends when time expires, every runner is caught, or the host ends it early.
 
+### Random team balance
+
+When the host presses **Randomize & deploy**, hunters are picked by a weighted draw instead of a flat coin flip: roughly one hunter per three runners, with a floor of two hunters once the lobby has at least three players. The table below shows the exact counts; which specific players become hunters is still shuffled every time.
+
+| Players | Hunters | Runners |
+|---|---|---|
+| 2 | 1 | 1 |
+| 3–8 | 2 | rest |
+| 9–12 | 3 | rest |
+| 13–16 | 4 | rest |
+| 17–20 | 5 | rest |
+| 50 | 13 | 37 |
+
+Late joiners during the reveal are assigned to whichever team keeps the hunter share closest to this target.
+
 ### Runner map and catch markers
 
 Runners get a live field map. The self marker on both the runner and hunter maps carries a small arrow on the rim of the avatar showing the direction the phone is facing, sourced from the device orientation sensor. Facing turns on automatically: on iOS the permission prompt is raised on your first tap on the field page and the choice is remembered, while other platforms start listening immediately where the browser allows it.
@@ -152,7 +167,7 @@ Caught runners keep streaming their own GPS so their spectator map still tracks 
 
 ### Dev bots
 
-The dev console (right-edge **Demo** tab, development builds only) can fill the lobby with bots for solo testing. Bots are assigned a balanced mix of hunters and runners, marked ready, and can be cleared again. The same panel reveals runner PINs and lets you jump between screens.
+The dev console (right-edge **Demo** tab, development builds only) can fill the lobby with bots for solo testing. Bots are assigned a balanced mix of hunters and runners, marked ready, and can be cleared again. The same panel reveals runner PINs and lets you jump between screens. It is locked behind a 4-digit access code (**1905**) so only the host can open it.
 
 ### Privacy
 
