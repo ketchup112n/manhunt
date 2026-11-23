@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type ReactNode, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import {
   BrowserRouter,
@@ -18,16 +18,35 @@ import { RoleRevealOverlay } from "@/components/game/RoleRevealOverlay";
 import { usePreferences } from "@/store/preferences";
 import { useGame, useYou } from "@/store/game";
 import { HomePage } from "@/pages/HomePage";
-import { CreateLobbyPage } from "@/pages/CreateLobbyPage";
-import { JoinPage } from "@/pages/JoinPage";
-import { LobbyPage } from "@/pages/LobbyPage";
-import { HunterPage } from "@/pages/HunterPage";
-import { RunnerPage } from "@/pages/RunnerPage";
-import { SpectatorPage } from "@/pages/SpectatorPage";
-import { ResultsPage } from "@/pages/ResultsPage";
-import { SettingsPage } from "@/pages/SettingsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import type { Role } from "@/lib/types";
+
+const CreateLobbyPage = lazy(() => import("@/pages/CreateLobbyPage").then((m) => ({ default: m.CreateLobbyPage })));
+const JoinPage = lazy(() => import("@/pages/JoinPage").then((m) => ({ default: m.JoinPage })));
+const LobbyPage = lazy(() => import("@/pages/LobbyPage").then((m) => ({ default: m.LobbyPage })));
+const HunterPage = lazy(() => import("@/pages/HunterPage").then((m) => ({ default: m.HunterPage })));
+const RunnerPage = lazy(() => import("@/pages/RunnerPage").then((m) => ({ default: m.RunnerPage })));
+const SpectatorPage = lazy(() => import("@/pages/SpectatorPage").then((m) => ({ default: m.SpectatorPage })));
+const ResultsPage = lazy(() => import("@/pages/ResultsPage").then((m) => ({ default: m.ResultsPage })));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+
+function LoadingFallback() {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-canvas">
+      <div className="flex flex-col items-center gap-4 text-center px-4">
+        <div className="relative flex h-10 w-10 items-center justify-center">
+          <svg className="h-10 w-10 text-runner/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="12" cy="12" r="10" strokeDasharray="62.83" strokeDashoffset="15.71" />
+          </svg>
+          <svg className="absolute h-10 w-10 text-runner animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10" strokeDasharray="62.83" strokeDashoffset="15.71" />
+          </svg>
+        </div>
+        <p className="label-mono text-ink">Loading…</p>
+      </div>
+    </div>
+  );
+}
 
 function ThemeSync() {
   const theme = usePreferences((state) => state.theme);
@@ -156,29 +175,82 @@ export function App() {
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<HomePage />} />
-            <Route path="create" element={<CreateLobbyPage />} />
-            <Route path="join" element={<JoinPage />} />
-            <Route path="join/:code" element={<JoinPage />} />
-            <Route path="lobby/:code" element={<LobbyPage />} />
+            <Route
+              path="create"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <CreateLobbyPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="join"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <JoinPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="join/:code"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <JoinPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="lobby/:code"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <LobbyPage />
+                </Suspense>
+              }
+            />
             <Route
               path="game/hunter"
               element={
-                <RoleGate role="hunter">
-                  <HunterPage />
-                </RoleGate>
+                <Suspense fallback={<LoadingFallback />}>
+                  <RoleGate role="hunter">
+                    <HunterPage />
+                  </RoleGate>
+                </Suspense>
               }
             />
             <Route
               path="game/runner"
               element={
-                <RoleGate role="runner">
-                  <RunnerPage />
-                </RoleGate>
+                <Suspense fallback={<LoadingFallback />}>
+                  <RoleGate role="runner">
+                    <RunnerPage />
+                  </RoleGate>
+                </Suspense>
               }
             />
-            <Route path="game/spectator" element={<SpectatorPage />} />
-            <Route path="results" element={<ResultsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
+            <Route
+              path="game/spectator"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <SpectatorPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="results"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <ResultsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <SettingsPage />
+                </Suspense>
+              }
+            />
             <Route path="game" element={<Navigate to="/game/hunter" replace />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

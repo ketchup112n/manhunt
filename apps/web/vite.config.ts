@@ -10,6 +10,19 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-leaflet": ["leaflet", "react-leaflet"],
+          "vendor-motion": ["motion"],
+          "vendor-ui": ["lucide-react", "clsx", "tailwind-merge", "zustand", "qrcode.react"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
+  },
   server: {
     host: true,
     port: 5173,

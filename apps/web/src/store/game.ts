@@ -26,7 +26,8 @@ export type ConnectionState =
   | "idle"
   | "connecting"
   | "connected"
-  | "disconnected";
+  | "disconnected"
+  | "waking";
 
 export type PositionStatus =
   | "idle"
@@ -107,6 +108,7 @@ interface GameStore {
   fillBots: (count?: number) => void;
   removeBots: () => void;
   setDeviceHeading: (heading: number) => void;
+  setWaking: (waking: boolean) => void;
   updateLocation: (lat: number, lng: number, accuracyM: number) => void;
   setLivePosition: (position: GeoPosition) => void;
   setPositionStatus: (status: PositionStatus, error?: string | null) => void;
@@ -293,6 +295,8 @@ function freshRoundState() {
   };
 }
 
+const WAKE_TIMEOUT_MS = 3000;
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
@@ -376,6 +380,21 @@ export const useGame = create<GameStore>((set, get) => {
     closeSocket();
     intentionalClose = false;
     clearReconnect();
+    let wakeTimer: number | null = window.setTimeout(() => {
+      wakeTimer = null;
+      const state = get();
+      if (state.connection === "connecting") {
+        set({ connection: "waking" });
+      }
+    }, WAKE_TIMEOUT_MS);
+
+    const clearWakeTimer = () => {
+      if (wakeTimer !== null) {
+        clearTimeout(wakeTimer);
+        wakeTimer = null;
+      }
+    };
+
     set({
       session,
       connection: "connecting",
@@ -387,6 +406,7 @@ export const useGame = create<GameStore>((set, get) => {
     try {
       next = new WebSocket(websocketUrl(session));
     } catch {
+      clearWakeTimer();
       set({
         connection: "disconnected",
         connectionError: "Could not open a realtime connection.",
@@ -396,6 +416,7 @@ export const useGame = create<GameStore>((set, get) => {
     socket = next;
 
     next.addEventListener("open", () => {
+      clearWakeTimer();
       if (socket !== next) return;
       reconnectAttempts = 0;
       set({ connection: "connected", connectionError: null });
@@ -407,6 +428,7 @@ export const useGame = create<GameStore>((set, get) => {
     });
 
     next.addEventListener("close", (event) => {
+      clearWakeTimer();
       if (socket !== next) return;
       socket = null;
       if (intentionalClose) {
@@ -578,6 +600,18 @@ export const useGame = create<GameStore>((set, get) => {
 
     updateDraftSettings: (settings) => {
       set((state) => ({ settings: { ...state.settings, ...settings } }));
+    },
+
+    setWaking: (waking) => {
+      set((state) => {
+        if (state.connection === "waking" && !waking) {
+          return { connection: "connecting" };
+        }
+        if (state.connection === "connecting" && waking) {
+          return { connection: "waking" };
+        }
+        return {};
+      });
     },
 
     assignPlayerRole: (id, role) => {
