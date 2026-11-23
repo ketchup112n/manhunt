@@ -44,6 +44,28 @@ const TRAIL_MIN_SPACING_M = 8;
 /** Hard cap on stored trail points; older points thin out once exceeded. */
 const TRAIL_MAX_POINTS = 1500;
 
+/** Shared snapshot data computed once per tick, identical for all viewers. */
+interface SharedSnapshotData {
+  phase: GamePhase;
+  timeLeftSec: number;
+  nextPingSec: number;
+  lastPingAgo: number;
+  pingCount: number;
+  pingExpiresInMs: number;
+  resultWinner: Winner | null;
+  center: LatLng | null;
+  settings: GameSettings;
+  started: boolean;
+  pingOpen: boolean;
+  exposedRunnerIds: Set<string>;
+  radiusM: number;
+  caughtSpots: CaughtSpot[];
+  revealRemainingSec: number;
+  prepRemainingSec: number;
+  /** Timestamp when this cache was computed. */
+  cacheTime: number;
+}
+
 export interface LobbyPlayer {
   id: string;
   token: string;
@@ -109,6 +131,11 @@ export class Lobby {
   /** Centre explicitly chosen by the host on the create screen. */
   private configuredCenter: LatLng | null = null;
   private botCursor = 0;
+
+  /** Monotonically increasing sequence for snapshot versioning. */
+  private snapshotSeq = 0;
+  /** Cached shared snapshot data computed once per tick. */
+  private sharedSnapshotCache: SharedSnapshotData | null = null;
 
   constructor(options: LobbyOptions) {
     this.code = options.code;
@@ -177,6 +204,207 @@ export class Lobby {
       if (!used.has(code)) return code;
     }
     return String(Math.floor(1000 + Math.random() * 9000));
+  }
+
+  /** Shared snapshot data that is identical for all viewers in a lobby. */
+  private computeSharedSnapshotData(now: number): SharedSnapshotData {
+    const phase = this.phase;
+    const timeLeftSec =
+      phase === "active"
+        ? Math.max(0, Math.ceil((this.endsAt - now) / 1000))
+        : phase === "ended"
+          ? 0
+          : Math.max(0, Math.round(this.settings.durationSec));
+
+    const nextPingSec =
+      phase === "active"
+        ? Math.max(0, Math.ceil((this.nextPingAt - now) / 1000))
+        : phase === "prep"
+          ? Math.max(0, Math.ceil((this.prepEndsAt - now) / 1000))
+          : Math.max(0, Math.round(this.settings.pingSec));
+
+    const lastPingAgo =
+      phase === "active"
+        ? Math.max(
+            0,
+            Math.floor(
+              (now - (this.lastPingAt || this.startedAt || now)) / 1000,
+            ),
+          )
+        : 0;
+
+    const started = this.phase !== "lobby";
+    const pingOpen = this.phase === "active" && this.pingExpiresAt > now;
+
+    /**
+     * Runners who have left the live play area. Their position stays visible
+     * to hunters until they step back inside (or are tagged).
+     */
+    const exposedRunnerIds = new Set<string>();
+    let radiusM = 0;
+    if (this.phase === "active" && this.center) {
+      const elapsedSec = Math.max(0, (now - this.startedAt) / 1000);
+      radiusM = currentZoneRadiusM(this.settings, elapsedSec);
+      for (const player of this.players.values()) {
+        if (
+          player.role !== "runner" ||
+          player.status !== "active" ||
+          !player.position
+        ) {
+          continue;
+        }
+        if (distanceMeters(this.center, player.position) > radiusM) {
+          exposedRunnerIds.add(player.id);
+        }
+      }
+    }
+
+    const caughtSpots: CaughtSpot[] = started
+      ? [...this.players.values()]
+          .filter((player) => player.status === "caught" && player.caughtAt)
+          .map((player) => ({
+            id: player.id,
+            name: player.name,
+            lat: player.caughtAt!.lat,
+            lng: player.caughtAt!.lng,
+            accuracyM: player.caughtAt!.accuracyM,
+            at: player.caughtAt!.at,
+          }))
+          .sort((a, b) => a.at - b.at)
+      : [];
+
+    return {
+      phase,
+      timeLeftSec,
+      nextPingSec,
+      lastPingAgo,
+      pingCount: this.pingCount,
+      pingExpiresInMs: Math.max(0, this.pingExpiresAt - now),
+      resultWinner: this.resultWinner,
+      center: this.center ? { ...this.center } : null,
+      settings: { ...this.settings },
+      started,
+      pingOpen,
+      exposedRunnerIds,
+      radiusM,
+      caughtSpots,
+      revealRemainingSec:
+        phase === "reveal"
+          ? Math.max(0, Math.ceil((this.revealEndsAt - now) / 1000))
+          : 0,
+      prepRemainingSec:
+        phase === "prep"
+          ? Math.max(0, Math.ceil((this.prepEndsAt - now) / 1000))
+          : 0,
+      cacheTime: now,
+    };
+  }
+
+  /** Invalidate the shared snapshot cache so it rebuilds on next tick. */
+  private invalidateSharedCache(): void {
+    this.sharedSnapshotCache = null;
+    this.snapshotSeq += 1;
+  }
+
+  /** Current snapshot sequence number for delta detection. */
+  getSnapshotSeq(): number {
+    return this.snapshotSeq;
+  }
+
+  /** Compute a lightweight signature of the viewer-relevant snapshot data. */
+  getViewerSignature(viewerId: string, _includeAllPins: boolean): string {
+    const viewer = this.players.get(viewerId);
+    const viewerRole: Role = viewer?.role ?? "unassigned";
+    const started = this.phase !== "lobby";
+    const pingOpen = this.phase === "active" && this.pingExpiresAt > Date.now();
+
+    // Build a compact signature of data that affects this viewer
+    const parts: (string | number)[] = [
+      this.snapshotSeq,
+      this.phase,
+      viewerRole,
+      started ? 1 : 0,
+      pingOpen ? 1 : 0,
+      this.pingCount,
+      this.pingExpiresAt,
+      this.resultWinner ?? "",
+    ];
+
+    // Add positions of visible players
+    for (const player of this.players.values()) {
+      if (!player.position) continue;
+      if (player.id === viewerId) {
+        parts.push("self", player.position.lat, player.position.lng, player.position.accuracyM, player.position.at);
+        continue;
+      }
+      if (!started || player.status === "caught") continue;
+
+      let visible = false;
+      if (viewerRole === "hunter") {
+        if (player.role === "hunter" && this.settings.showHunterTeammates) visible = true;
+        if (player.role === "runner") {
+          // Exposed runners are always visible to hunters
+          // Check if this runner is exposed
+          const exposed = this.isRunnerExposed(player);
+          if (exposed || pingOpen) visible = true;
+        }
+      } else if (viewerRole === "runner") {
+        if (player.role === "runner") visible = true;
+        if (player.role === "hunter" && (this.settings.showAllHuntersToRunners || pingOpen)) visible = true;
+      }
+
+      if (visible) {
+        parts.push(player.id, player.position.lat, player.position.lng, player.position.accuracyM, player.position.at);
+      }
+    }
+
+    // Add caught spots count
+    const caughtCount = [...this.players.values()].filter((p) => p.status === "caught").length;
+    parts.push("caught", caughtCount);
+
+    return parts.join("|");
+  }
+
+  /** Check if a runner is currently outside the play area (exposed). */
+  private isRunnerExposed(player: LobbyPlayer): boolean {
+    if (player.role !== "runner" || player.status !== "active" || !player.position || !this.center) return false;
+    const now = Date.now();
+    const elapsedSec = Math.max(0, (now - this.startedAt) / 1000);
+    const radiusM = currentZoneRadiusM(this.settings, elapsedSec);
+    return distanceMeters(this.center, player.position) > radiusM;
+  }
+
+  /** Get countdown data for lightweight tick messages. */
+  getTickData(now: number): { timeLeftSec: number; nextPingSec: number; revealRemainingSec: number; prepRemainingSec: number; pingCount: number } {
+    const phase = this.phase;
+    const timeLeftSec =
+      phase === "active"
+        ? Math.max(0, Math.ceil((this.endsAt - now) / 1000))
+        : phase === "ended"
+          ? 0
+          : Math.max(0, Math.round(this.settings.durationSec));
+    const nextPingSec =
+      phase === "active"
+        ? Math.max(0, Math.ceil((this.nextPingAt - now) / 1000))
+        : phase === "prep"
+          ? Math.max(0, Math.ceil((this.prepEndsAt - now) / 1000))
+          : Math.max(0, Math.round(this.settings.pingSec));
+    const revealRemainingSec =
+      phase === "reveal"
+        ? Math.max(0, Math.ceil((this.revealEndsAt - now) / 1000))
+        : 0;
+    const prepRemainingSec =
+      phase === "prep"
+        ? Math.max(0, Math.ceil((this.prepEndsAt - now) / 1000))
+        : 0;
+
+    return {
+      timeLeftSec,
+      nextPingSec,
+      revealRemainingSec,
+      prepRemainingSec,
+      pingCount: this.pingCount,
+    };
   }
 
   addPlayer(rawName: string): LobbyPlayer | { error: string } {
@@ -318,6 +546,7 @@ export class Lobby {
       }
     }
 
+    if (changed) this.invalidateSharedCache();
     return changed;
   }
 
@@ -328,6 +557,7 @@ export class Lobby {
     if (!this.center) this.ensureCenter();
     this.revealEndsAt = now + REVEAL_SEC * 1000;
     if (REVEAL_SEC <= 0) this.beginPrep(now);
+    this.invalidateSharedCache();
   }
 
   private beginPrep(now: number): void {
@@ -336,6 +566,7 @@ export class Lobby {
     if (!this.center) this.ensureCenter();
     this.prepEndsAt = now + Math.max(0, this.settings.prepSec) * 1000;
     if (this.settings.prepSec <= 0) this.beginActive(now);
+    this.invalidateSharedCache();
   }
 
   private beginActive(now: number): void {
@@ -358,6 +589,7 @@ export class Lobby {
         ? [{ lat: player.position.lat, lng: player.position.lng }]
         : [];
     }
+    this.invalidateSharedCache();
   }
 
   /**
@@ -380,6 +612,7 @@ export class Lobby {
         this.hunterPingPositions.set(player.id, { ...player.position });
       }
     }
+    this.invalidateSharedCache();
   }
 
   /** Host location first, then any other player who has already shared a fix. */
@@ -415,6 +648,7 @@ export class Lobby {
         if (player.role === "runner") player.status = "caught";
       }
     }
+    this.invalidateSharedCache();
   }
 
   /** Host restart: return the finished lobby to a fresh briefing room. */
@@ -439,6 +673,7 @@ export class Lobby {
       player.trail = [];
       player.distanceM = 0;
     }
+    this.invalidateSharedCache();
   }
 
   handle(playerId: string, message: ClientMessage): ActionResult {
@@ -599,6 +834,11 @@ export class Lobby {
         ) {
           this.ensureCenter();
         }
+        // Invalidate shared cache when positions change during active phase
+        // so exposed runner set is recomputed on next tick/snapshot
+        if (this.phase === "active") {
+          this.invalidateSharedCache();
+        }
         return { changed: false };
       }
 
@@ -739,57 +979,21 @@ export class Lobby {
 
   snapshotFor(viewerId: string, includeAllPins: boolean): Snapshot {
     const now = Date.now();
-    const phase = this.phase;
-    const timeLeftSec =
-      phase === "active"
-        ? Math.max(0, Math.ceil((this.endsAt - now) / 1000))
-        : phase === "ended"
-          ? 0
-          : Math.max(0, Math.round(this.settings.durationSec));
 
-    const nextPingSec =
-      phase === "active"
-        ? Math.max(0, Math.ceil((this.nextPingAt - now) / 1000))
-        : phase === "prep"
-          ? Math.max(0, Math.ceil((this.prepEndsAt - now) / 1000))
-          : Math.max(0, Math.round(this.settings.pingSec));
-
-    const lastPingAgo =
-      phase === "active"
-        ? Math.max(
-            0,
-            Math.floor(
-              (now - (this.lastPingAt || this.startedAt || now)) / 1000,
-            ),
-          )
-        : 0;
+    // Compute or reuse shared snapshot data
+    // Recompute if cache is stale (>2s old) to handle time jumps (e.g. tests mocking Date.now)
+    const CACHE_MAX_AGE_MS = 2000;
+    if (
+      !this.sharedSnapshotCache ||
+      now - this.sharedSnapshotCache.cacheTime > CACHE_MAX_AGE_MS
+    ) {
+      this.sharedSnapshotCache = this.computeSharedSnapshotData(now);
+    }
+    const shared = this.sharedSnapshotCache;
 
     const viewer = this.players.get(viewerId);
     const viewerRole: Role = viewer?.role ?? "unassigned";
-    const started = this.phase !== "lobby";
-    const pingOpen = this.phase === "active" && this.pingExpiresAt > now;
-
-    /**
-     * Runners who have left the live play area. Their position stays visible
-     * to hunters until they step back inside (or are tagged).
-     */
-    const exposedRunnerIds = new Set<string>();
-    if (this.phase === "active" && this.center) {
-      const elapsedSec = Math.max(0, (now - this.startedAt) / 1000);
-      const radiusM = currentZoneRadiusM(this.settings, elapsedSec);
-      for (const player of this.players.values()) {
-        if (
-          player.role !== "runner" ||
-          player.status !== "active" ||
-          !player.position
-        ) {
-          continue;
-        }
-        if (distanceMeters(this.center, player.position) > radiusM) {
-          exposedRunnerIds.add(player.id);
-        }
-      }
-    }
+    const { started, pingOpen, exposedRunnerIds, caughtSpots: sharedCaughtSpots, settings, phase } = shared;
 
     /**
      * Location visibility is decided per viewer:
@@ -807,7 +1011,7 @@ export class Lobby {
 
       if (viewerRole === "hunter") {
         if (player.role === "hunter") {
-          return this.settings.showHunterTeammates ? player.position : undefined;
+          return settings.showHunterTeammates ? player.position : undefined;
         }
         if (player.role === "runner") {
           // An exposed runner is tracked live; the ping snapshot is frozen.
@@ -820,7 +1024,7 @@ export class Lobby {
       if (viewerRole === "runner") {
         if (player.role === "runner") return player.position;
         if (player.role === "hunter") {
-          if (this.settings.showAllHuntersToRunners) return player.position;
+          if (settings.showAllHuntersToRunners) return player.position;
           if (pingOpen) return this.hunterPingPositions.get(player.id);
         }
         return undefined;
@@ -849,7 +1053,7 @@ export class Lobby {
     if (
       viewerRole === "runner" &&
       viewer?.position &&
-      !this.settings.showAllHuntersToRunners &&
+      !settings.showAllHuntersToRunners &&
       !pingOpen
     ) {
       let closest: LobbyPlayer | null = null;
@@ -871,44 +1075,24 @@ export class Lobby {
       }
     }
 
-    const caughtSpots: CaughtSpot[] = started
-      ? [...this.players.values()]
-          .filter((player) => player.status === "caught" && player.caughtAt)
-          .map((player) => ({
-            id: player.id,
-            name: player.name,
-            lat: player.caughtAt!.lat,
-            lng: player.caughtAt!.lng,
-            accuracyM: player.caughtAt!.accuracyM,
-            at: player.caughtAt!.at,
-          }))
-          .sort((a, b) => a.at - b.at)
-      : [];
-
     return {
       code: this.code,
       phase,
       hostId: this.hostId,
-      settings: { ...this.settings },
+      settings,
       players,
       youId: viewerId,
-      timeLeftSec,
-      revealRemainingSec:
-        phase === "reveal"
-          ? Math.max(0, Math.ceil((this.revealEndsAt - now) / 1000))
-          : 0,
-      prepRemainingSec:
-        phase === "prep"
-          ? Math.max(0, Math.ceil((this.prepEndsAt - now) / 1000))
-          : 0,
-      nextPingSec,
-      lastPingAgo,
-      pingCount: this.pingCount,
-      pingExpiresInMs: Math.max(0, this.pingExpiresAt - now),
-      resultWinner: this.resultWinner,
-      center: this.center ? { ...this.center } : null,
+      timeLeftSec: shared.timeLeftSec,
+      revealRemainingSec: shared.revealRemainingSec,
+      prepRemainingSec: shared.prepRemainingSec,
+      nextPingSec: shared.nextPingSec,
+      lastPingAgo: shared.lastPingAgo,
+      pingCount: shared.pingCount,
+      pingExpiresInMs: shared.pingExpiresInMs,
+      resultWinner: shared.resultWinner,
+      center: shared.center,
       nearestHunter,
-      caughtSpots,
+      caughtSpots: sharedCaughtSpots,
       trail:
         phase === "ended" && viewer
           ? viewer.trail.map((point) => ({ lat: point.lat, lng: point.lng }))

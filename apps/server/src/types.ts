@@ -138,4 +138,5 @@ export type ClientMessage =
 export type ServerMessage =
   | { type: "state"; state: Snapshot }
   | { type: "tagResult"; tag: TagResult }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "tick"; timeLeftSec: number; nextPingSec: number; revealRemainingSec: number; prepRemainingSec: number; pingCount: number };

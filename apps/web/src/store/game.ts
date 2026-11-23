@@ -63,6 +63,7 @@ interface GameStore {
   actionError: { message: string; at: number } | null;
   timeLeftSec: number;
   revealEndsAt: number;
+  revealRemainingSec: number;
   prepRemainingSec: number;
   nextPingSec: number;
   lastPingAgo: number;
@@ -135,6 +136,7 @@ const initialState = {
   actionError: null as { message: string; at: number } | null,
   timeLeftSec: DEFAULT_SETTINGS.durationSec,
   revealEndsAt: 0,
+  revealRemainingSec: 0,
   prepRemainingSec: 0,
   nextPingSec: DEFAULT_SETTINGS.pingSec,
   lastPingAgo: 0,
@@ -272,6 +274,7 @@ function freshRoundState() {
     actionError: null as { message: string; at: number } | null,
     timeLeftSec: DEFAULT_SETTINGS.durationSec,
     revealEndsAt: 0,
+    revealRemainingSec: 0,
     prepRemainingSec: 0,
     nextPingSec: DEFAULT_SETTINGS.pingSec,
     lastPingAgo: 0,
@@ -361,6 +364,19 @@ export const useGame = create<GameStore>((set, get) => {
       case "state":
         applySnapshot(message.state);
         break;
+      case "tick": {
+        // Lightweight countdown update - only update the fields that change
+        const now = Date.now();
+        set({
+          timeLeftSec: message.timeLeftSec,
+          nextPingSec: message.nextPingSec,
+          revealRemainingSec: message.revealRemainingSec,
+          revealEndsAt: message.revealRemainingSec > 0 ? now + message.revealRemainingSec * 1000 : 0,
+          prepRemainingSec: message.prepRemainingSec,
+          pingCount: message.pingCount,
+        });
+        break;
+      }
       case "tagResult":
         set({
           tagState: message.tag.result,

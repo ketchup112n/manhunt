@@ -29,6 +29,10 @@ interface SocketContext {
   lobby: Lobby;
   playerId: string;
   alive: boolean;
+  /** Last viewer signature sent; used for delta detection. */
+  lastSignature: string | null;
+  /** Last full snapshot sequence number sent. */
+  lastSnapshotSeq: number;
 }
 
 const sockets = new Map<WebSocket, SocketContext>();
@@ -80,14 +84,53 @@ function snapshotMessage(lobby: Lobby, playerId: string): ServerMessage {
   };
 }
 
-function sendState(socket: WebSocket, context: SocketContext): void {
-  send(socket, snapshotMessage(context.lobby, context.playerId));
+function tickMessage(lobby: Lobby): ServerMessage {
+  const now = Date.now();
+  const { timeLeftSec, nextPingSec, revealRemainingSec, prepRemainingSec, pingCount } = lobby.getTickData(now);
+
+  return {
+    type: "tick",
+    timeLeftSec,
+    nextPingSec,
+    revealRemainingSec,
+    prepRemainingSec,
+    pingCount,
+  };
 }
 
+function sendState(socket: WebSocket, context: SocketContext): void {
+  send(socket, snapshotMessage(context.lobby, context.playerId));
+  context.lastSnapshotSeq = context.lobby.getSnapshotSeq();
+  context.lastSignature = context.lobby.getViewerSignature(context.playerId, DEV_PINS);
+}
+
+function sendTick(socket: WebSocket, context: SocketContext): void {
+  send(socket, tickMessage(context.lobby));
+}
+
+/** Broadcast full snapshots only to viewers whose relevant data changed. */
 function broadcast(lobby: Lobby): void {
   for (const [socket, context] of sockets) {
     if (context.lobby !== lobby) continue;
-    sendState(socket, context);
+    const currentSig = lobby.getViewerSignature(context.playerId, DEV_PINS);
+    const seqChanged = context.lastSnapshotSeq !== lobby.getSnapshotSeq();
+
+    // Always send full snapshot on first connect or when sequence changed (structural change)
+    if (context.lastSignature === null || seqChanged) {
+      sendState(socket, context);
+    } else if (currentSig !== context.lastSignature) {
+      // Viewer-relevant data changed
+      sendState(socket, context);
+    }
+    // Else: no change for this viewer, skip sending
+  }
+}
+
+/** Lightweight tick broadcast for countdown phases (reveal/prep). */
+function broadcastTick(lobby: Lobby): void {
+  for (const [socket, context] of sockets) {
+    if (context.lobby !== lobby) continue;
+    sendTick(socket, context);
   }
 }
 
@@ -331,6 +374,8 @@ wss.on("connection", (socket: WebSocket, request: IncomingMessage) => {
     lobby,
     playerId: player.id,
     alive: true,
+    lastSignature: null,
+    lastSnapshotSeq: 0,
   };
   sockets.set(socket, context);
   lobby.setConnected(player.id, true);
@@ -411,14 +456,25 @@ const ticker = setInterval(() => {
   const now = Date.now();
   for (const [code, lobby] of lobbies) {
     const changed = lobby.tick(now);
-    if (
-      changed ||
-      lobby.phase === "reveal" ||
-      lobby.phase === "prep" ||
-      lobby.phase === "active"
-    ) {
+
+    if (lobby.phase === "active") {
+      // Active phase: full broadcast with delta detection on every tick when state changes
+      if (changed) {
+        broadcast(lobby);
+      }
+    } else if (lobby.phase === "reveal" || lobby.phase === "prep") {
+      // Reveal/prep phases: lightweight tick broadcast every second for countdowns
+      // Full broadcast only when structural changes occur (phase transitions)
+      if (changed) {
+        broadcast(lobby);
+      } else {
+        broadcastTick(lobby);
+      }
+    } else if (changed) {
+      // Lobby phase: only broadcast on actual changes
       broadcast(lobby);
     }
+
     if (lobby.empty) {
       lobbies.delete(code);
       lastActivity.delete(code);
