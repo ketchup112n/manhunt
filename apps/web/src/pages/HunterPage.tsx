@@ -51,9 +51,7 @@ export function HunterPage() {
   const units = usePreferences((state) => state.units);
   const timeLeftSec = useGame((state) => state.timeLeftSec);
   const nextPingSec = useGame((state) => state.nextPingSec);
-  const lastPingAgo = useGame((state) => state.lastPingAgo);
   const pingCount = useGame((state) => state.pingCount);
-  const pingExpiresAt = useGame((state) => state.pingExpiresAt);
   const phase = useGame((state) => state.phase);
   const center = useGame((state) => state.center);
   const livePosition = useGame((state) => state.livePosition);
@@ -68,7 +66,6 @@ export function HunterPage() {
   const [tagOpen, setTagOpen] = useState(false);
   const [endMatchOpen, setEndMatchOpen] = useState(false);
   const [kickOpen, setKickOpen] = useState(false);
-  const [pingWindowOpen, setPingWindowOpen] = useState(false);
   const [tagCode, setTagCode] = useState("");
   const [flash, setFlash] = useState(false);
   const previousPing = useRef(pingCount);
@@ -77,6 +74,7 @@ export function HunterPage() {
   const activeRunners = players.filter(
     (player) => player.role === "runner" && player.status === "active",
   );
+  const exposedCount = activeRunners.filter((player) => player.exposed).length;
 
   /** Prefer the newest device fix over the last one the server echoed back. */
   const selfFix = livePosition ?? you?.position ?? null;
@@ -90,37 +88,20 @@ export function HunterPage() {
       }
     : null;
 
-  useEffect(() => {
-    if (!pingExpiresAt) return;
-    let expiryTimer: number | undefined;
-    const syncTimer = window.setTimeout(() => {
-      const remaining = pingExpiresAt - Date.now();
-      setPingWindowOpen(phase === "active" && pingCount > 0 && remaining > 0);
-      if (remaining > 0) {
-        expiryTimer = window.setTimeout(() => setPingWindowOpen(false), remaining);
-      }
-    }, 0);
-    return () => {
-      window.clearTimeout(syncTimer);
-      if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
-    };
-  }, [pingExpiresAt, phase, pingCount]);
-
   const signals = useMemo<RunnerSignal[]>(
     () =>
-      !pingWindowOpen
-        ? []
-        : activeRunners
-            .filter((player) => player.position)
-            .map((player) => ({
-              id: player.id,
-              name: player.name,
-              lat: player.position!.lat,
-              lng: player.position!.lng,
-              accuracyM: player.position!.accuracyM,
-              seenAt: lastPingAgo,
-            })),
-    [activeRunners, lastPingAgo, pingWindowOpen],
+      activeRunners
+        .filter((player) => player.position)
+        .map((player) => ({
+          id: player.id,
+          name: player.name,
+          lat: player.position!.lat,
+          lng: player.position!.lng,
+          accuracyM: player.position!.accuracyM,
+          seenAt: player.position!.at,
+          exposed: player.exposed,
+        })),
+    [activeRunners],
   );
 
   useEffect(() => {
@@ -279,6 +260,7 @@ export function HunterPage() {
         <div className="pointer-events-none absolute left-3 top-1/2 z-[390] hidden -translate-y-1/2 flex-col gap-2 lg:flex">
           <div className="rounded-[2px] border border-line-strong/50 bg-surface/85 px-2.5 py-2 backdrop-blur-md">
             <Legend tone="runner" label="Runner ping" />
+            <Legend tone="warning" label="Outside area" />
             <Legend tone="hunter" label="Hunter" />
             <Legend tone="self" label="You" />
             <Legend tone="caught" label="Caught site" />
@@ -293,6 +275,25 @@ export function HunterPage() {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[420]">
         <div className="pointer-events-auto border-t border-line bg-surface/95 p-3 safe-bottom backdrop-blur-md">
           <div className="mx-auto max-w-5xl">
+            {exposedCount > 0 ? (
+              <div
+                role="status"
+                className="mb-2 flex items-start gap-2.5 rounded-[3px] border border-warning/40 bg-warning/10 px-3 py-2"
+              >
+                <Siren className="mt-0.5 size-4 shrink-0 text-warning" />
+                <div>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-warning">
+                    Runner outside the play area
+                  </p>
+                  <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+                    {exposedCount === 1
+                      ? "1 live signal"
+                      : `${exposedCount} live signals`}{" "}
+                    on the map until they return inside.
+                  </p>
+                </div>
+              </div>
+            ) : null}
             {allCaught ? (
               you?.isHost ? (
                 <Button
@@ -448,11 +449,17 @@ export function HunterPage() {
             label="Runner intel"
             value={settings.showAllHuntersToRunners ? "All hunters (live)" : "Nearest + pings"}
           />
+          <RuleRow
+            label="Outside play area"
+            value="Live to hunters"
+            accent="warning"
+          />
         </div>
         <p className="mt-4 border-t border-line pt-3 font-mono text-[8px] uppercase leading-relaxed tracking-[0.12em] text-faint">
           Hunter markers are anonymous. When intel is enabled, runners see
           bearing and distance to nearby hunters, never a live position unless
-          the host has enabled all-hunter intel.
+          the host has enabled all-hunter intel. Any runner outside the
+          boundary stays live on this map until they return inside.
         </p>
         <ZoneRuleNote tone="hunter" />
       </Modal>
@@ -468,7 +475,7 @@ function Legend({
   tone,
   label,
 }: {
-  tone: "runner" | "hunter" | "self" | "caught";
+  tone: "runner" | "hunter" | "self" | "caught" | "warning";
   label: string;
 }) {
   return (
@@ -482,7 +489,9 @@ function Legend({
               ? "bg-hunter"
               : tone === "caught"
                 ? "bg-danger"
-                : "border border-runner bg-ink",
+                : tone === "warning"
+                  ? "bg-warning"
+                  : "border border-runner bg-ink",
         )}
       />
       <span className="font-mono text-[7px] uppercase tracking-[0.14em] text-muted">{label}</span>
@@ -570,7 +579,7 @@ function RuleRow({
 }: {
   label: string;
   value: string;
-  accent?: "hunter" | "runner";
+  accent?: "hunter" | "runner" | "warning";
 }) {
   return (
     <div className="flex items-center justify-between border-b border-line/60 py-2.5 last:border-0">
@@ -578,7 +587,13 @@ function RuleRow({
       <span
         className={cn(
           "font-mono text-[10px] uppercase tracking-[0.08em]",
-          accent === "hunter" ? "text-hunter" : accent === "runner" ? "text-runner" : "text-ink",
+          accent === "hunter"
+            ? "text-hunter"
+            : accent === "runner"
+              ? "text-runner"
+              : accent === "warning"
+                ? "text-warning"
+                : "text-ink",
         )}
       >
         {value}

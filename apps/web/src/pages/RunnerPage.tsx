@@ -70,6 +70,7 @@ export function RunnerPage() {
   const activeRunners = players.filter(
     (player) => player.role === "runner" && player.status === "active",
   );
+  const exposed = Boolean(you?.exposed);
 
   const pingProgress = settings.pingSec === 0 ? 0 : nextPingSec / settings.pingSec;
   const recentlyLocated = pingWindowOpen && pingCount > 0;
@@ -171,13 +172,50 @@ export function RunnerPage() {
           <div className="hidden items-center gap-2 font-mono text-[8px] uppercase tracking-[0.18em] text-faint sm:flex">
             <span>Live GPS</span>
             <span className="h-3 w-px bg-line-strong" />
-            <span className={recentlyLocated ? "text-warning" : "text-runner"}>
-              {recentlyLocated ? "Exposed" : "Signal secure"}
+            <span
+              className={
+                exposed
+                  ? "text-danger"
+                  : recentlyLocated
+                    ? "text-warning"
+                    : "text-runner"
+              }
+            >
+              {exposed
+                ? "Outside zone / exposed"
+                : recentlyLocated
+                  ? "Exposed"
+                  : "Signal secure"}
             </span>
           </div>
         </div>
 
         <GpsBanner className="mt-3" />
+
+        <AnimatePresence>
+          {exposed ? (
+            <motion.div
+              role="alert"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mt-3 flex items-start gap-3 rounded-[3px] border border-danger/55 bg-danger/10 px-4 py-3 shadow-[0_0_32px_color-mix(in_srgb,var(--danger)_14%,transparent)]"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-danger/40 bg-danger/15 text-danger">
+                <AlertTriangle className="size-4 animate-soft-pulse" />
+              </span>
+              <div>
+                <p className="font-display text-sm font-semibold uppercase tracking-[0.04em] text-danger">
+                  Outside the play area
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                  Hunters can see your live location right now. Get back inside
+                  the boundary to disappear from their map.
+                </p>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <StatTile
@@ -205,8 +243,8 @@ export function RunnerPage() {
                 </h1>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
-                <Chip tone={recentlyLocated ? "warning" : "runner"} dot>
-                  {recentlyLocated ? "Exposed" : "Tracking"}
+                <Chip tone={exposed ? "danger" : recentlyLocated ? "warning" : "runner"} dot>
+                  {exposed ? "Out of bounds" : recentlyLocated ? "Exposed" : "Tracking"}
                 </Chip>
                 <Chip
                   tone={visibleHunters.length > 0 ? "hunter" : "runner"}
@@ -272,9 +310,10 @@ export function RunnerPage() {
             {!settings.showAllHuntersToRunners ? (
               <p className="border-t border-line px-4 py-2.5 font-mono text-[7px] uppercase leading-relaxed tracking-[0.12em] text-faint">
                 Between pings only your squad and caught sites are marked. Every
-                ping also reveals hunter positions for ten seconds. Enable
-                all-hunter intel in lobby rules to keep hunters visible all
-                round.
+                ping also reveals hunter positions for ten seconds. Leave the
+                play area and hunters see your live position until you return.
+                Enable all-hunter intel in lobby rules to keep hunters visible
+                all round.
               </p>
             ) : null}
           </Card>
@@ -288,6 +327,7 @@ export function RunnerPage() {
               pingProgress={pingProgress}
               pingSec={settings.pingSec}
               recentlyLocated={recentlyLocated}
+              exposed={exposed}
             />
 
             <Card className="p-4">
@@ -321,14 +361,21 @@ export function RunnerPage() {
                 <span className="font-mono text-[7px] uppercase tracking-[0.16em] text-faint">
                   Play area
                 </span>
-                <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-runner">
-                  {zone.enabled
-                    ? zone.phase === "closed"
-                      ? "Boundary closed"
-                      : zone.isShrinking
-                        ? "Shrinking now"
-                        : "Holding"
-                    : `Static · ${formatRadius(settings.playAreaM, units)}`}
+                <span
+                  className={cn(
+                    "font-mono text-[8px] uppercase tracking-[0.12em]",
+                    exposed ? "text-danger" : "text-runner",
+                  )}
+                >
+                  {exposed
+                    ? "Outside boundary"
+                    : zone.enabled
+                      ? zone.phase === "closed"
+                        ? "Boundary closed"
+                        : zone.isShrinking
+                          ? "Shrinking now"
+                          : "Holding"
+                      : `Static · ${formatRadius(settings.playAreaM, units)}`}
                 </span>
               </div>
               <div className="mt-2 flex items-center gap-1">
@@ -484,10 +531,17 @@ export function RunnerPage() {
             label="All-hunter intel"
             value={settings.showAllHuntersToRunners ? "Enabled (map + list)" : "Ping window only"}
           />
+          <RuleRow
+            label="Outside play area"
+            value="Live to hunters"
+            accent="warning"
+          />
         </div>
         <p className="mt-4 border-t border-line pt-3 font-mono text-[8px] uppercase leading-relaxed tracking-[0.12em] text-faint">
           The map shows your squad and caught sites. When all-hunter intel is
           enabled, anonymous hunter markers also appear with their distance.
+          Leave the play area and hunters follow your live position until you
+          return inside.
         </p>
         <ZoneRuleNote tone="runner" />
       </Modal>
@@ -545,55 +599,85 @@ function ExposureCard({
   pingProgress,
   pingSec,
   recentlyLocated,
+  exposed,
 }: {
   nextPingSec: number;
   lastPingAgo: number;
   pingProgress: number;
   pingSec: number;
   recentlyLocated: boolean;
+  exposed: boolean;
 }) {
   return (
     <Card
       corners
       className={cn(
         "overflow-hidden transition-colors",
-        recentlyLocated && "border-warning/40",
+        exposed
+          ? "border-danger/50"
+          : recentlyLocated && "border-warning/40",
       )}
     >
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <div className="flex items-center gap-2">
-          <Radar className={cn("size-3.5", recentlyLocated ? "text-warning" : "text-runner")} />
+          <Radar
+            className={cn(
+              "size-3.5",
+              exposed
+                ? "text-danger"
+                : recentlyLocated
+                  ? "text-warning"
+                  : "text-runner",
+            )}
+          />
           <p className="label-mono">Signal exposure</p>
         </div>
-        <Chip tone={recentlyLocated ? "warning" : "runner"} dot>
-          {recentlyLocated ? "Located" : "Hidden"}
+        <Chip
+          tone={exposed ? "danger" : recentlyLocated ? "warning" : "runner"}
+          dot
+        >
+          {exposed ? "Live" : recentlyLocated ? "Located" : "Hidden"}
         </Chip>
       </div>
       <div className="p-4">
         <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-faint">
-          {recentlyLocated ? "Last broadcast" : "Next broadcast in"}
+          {exposed
+            ? "Live to hunters"
+            : recentlyLocated
+              ? "Last broadcast"
+              : "Next broadcast in"}
         </p>
         <p
           className={cn(
             "mt-2 font-mono text-4xl tabular tracking-[-0.04em]",
-            recentlyLocated ? "text-warning" : "text-ink",
+            exposed
+              ? "text-danger"
+              : recentlyLocated
+                ? "text-warning"
+                : "text-ink",
           )}
         >
-          {formatClock(recentlyLocated ? lastPingAgo : nextPingSec)}
+          {exposed
+            ? "LIVE"
+            : formatClock(recentlyLocated ? lastPingAgo : nextPingSec)}
         </p>
         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-3">
           <div
             className={cn(
               "h-full rounded-full transition-[width] duration-1000 ease-linear",
-              recentlyLocated ? "bg-warning" : "bg-runner",
+              exposed
+                ? "bg-danger"
+                : recentlyLocated
+                  ? "bg-warning"
+                  : "bg-runner",
             )}
             style={{ width: `${Math.min(100, Math.max(0, pingProgress * 100))}%` }}
           />
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-muted">
-          Every {Math.round(pingSec / 60)} minutes, hunters receive your
-          coordinates for ten seconds. During that same window you see every
-          hunter's position, then both sides go dark until the next ping.
+          {exposed
+            ? "You are outside the play area. Hunters can see your live position until you step back inside the boundary."
+            : `Every ${Math.round(pingSec / 60)} minutes, hunters receive your coordinates for ten seconds. During that same window you see every hunter's position, then both sides go dark until the next ping.`}
         </p>
       </div>
     </Card>
@@ -659,7 +743,7 @@ function RuleRow({
 }: {
   label: string;
   value: string;
-  accent?: "hunter" | "runner";
+  accent?: "hunter" | "runner" | "warning";
 }) {
   return (
     <div className="flex items-center justify-between border-b border-line/60 py-2.5 last:border-0">
@@ -667,7 +751,13 @@ function RuleRow({
       <span
         className={cn(
           "font-mono text-[10px] uppercase tracking-[0.08em]",
-          accent === "hunter" ? "text-hunter" : accent === "runner" ? "text-runner" : "text-ink",
+          accent === "hunter"
+            ? "text-hunter"
+            : accent === "runner"
+              ? "text-runner"
+              : accent === "warning"
+                ? "text-warning"
+                : "text-ink",
         )}
       >
         {value}

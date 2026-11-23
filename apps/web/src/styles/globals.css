@@ -611,6 +611,31 @@ input[type="range"].hud-range::-moz-range-thumb {
   animation: ping-ring 1.4s ease-out infinite;
 }
 
+.player-marker--exposed .player-marker__avatar {
+  background: color-mix(in srgb, var(--warning) 24%, var(--surface));
+  color: var(--warning);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--warning) 78%, transparent),
+    0 4px 14px rgb(0 0 0 / 0.55),
+    0 0 26px color-mix(in srgb, var(--warning) 38%, transparent);
+}
+
+.player-marker--exposed .player-marker__label {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 55%, transparent);
+}
+
+.player-marker__exposed {
+  position: absolute;
+  top: -5px;
+  left: calc(50% - 21px);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--warning);
+  animation: ping-ring 1.8s ease-out infinite;
+}
+
 /* ---------- custom scrollbar ---------- */
 
 ::-webkit-scrollbar {

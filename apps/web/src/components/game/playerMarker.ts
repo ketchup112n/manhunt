@@ -4,6 +4,8 @@ export type PlayerMarkerRole = "self" | "hunter" | "runner" | "caught";
 
 export interface PlayerMarkerOptions {
   ping?: boolean;
+  /** Runner is outside the play area and being tracked live. */
+  exposed?: boolean;
   /** Heading in degrees, clockwise from north. */
   heading?: number | null;
 }
@@ -31,7 +33,7 @@ export function createPlayerMarkerIcon(
   name: string,
   options: PlayerMarkerOptions = {},
 ): DivIcon {
-  const { ping = false, heading } = options;
+  const { ping = false, exposed = false, heading } = options;
   const label = escapeHtml(name);
   const initials =
     role === "hunter"
@@ -49,8 +51,9 @@ export function createPlayerMarkerIcon(
 
   return L.divIcon({
     className: "manhunt-player-marker",
-    html: `<span class="player-marker player-marker--${role}">
+    html: `<span class="player-marker player-marker--${role}${exposed ? " player-marker--exposed" : ""}">
       ${ping ? '<span class="player-marker__ping" aria-hidden="true"></span>' : ""}
+      ${exposed ? '<span class="player-marker__exposed" aria-hidden="true"></span>' : ""}
       ${headingMarkup}
       <span class="player-marker__avatar" aria-hidden="true">${initials}</span>
       <span class="player-marker__label">${label}</span>

@@ -273,7 +273,7 @@ test("hunters see runners only during a ping window, frozen at ping time", () =>
   )?.position;
   assert.equal(frozen?.lat, 40.7);
 
-  movePlayer(lobby, runners[0].id, 41, -75);
+  movePlayer(lobby, runners[0].id, 40.7002, -74);
   const stillFrozen = lobby.snapshotFor(hostId, false);
   assert.equal(
     stillFrozen.players.find((player) => player.id === runners[0].id)?.position
@@ -291,6 +291,88 @@ test("hunters see runners only during a ping window, frozen at ping time", () =>
     caught.players.find((player) => player.id === runners[0].id)?.position,
     undefined,
   );
+});
+
+test("a runner outside the play area is exposed to hunters until they return", () => {
+  const { lobby, hostId } = lobbyWithPlayers(2);
+  const runners = [...lobby.players.values()].filter(
+    (player) => player.role === "runner",
+  );
+  deploy(lobby, hostId);
+
+  movePlayer(lobby, hostId, 40.7, -74);
+  movePlayer(lobby, runners[0].id, 40.7005, -74);
+  movePlayer(lobby, runners[1].id, 40.8, -74);
+
+  const outside = lobby.snapshotFor(hostId, false);
+  const byId = new Map(outside.players.map((player) => [player.id, player]));
+
+  assert.equal(byId.get(runners[0].id)?.exposed, false);
+  assert.equal(byId.get(runners[0].id)?.position, undefined);
+  assert.equal(byId.get(runners[1].id)?.exposed, true);
+  assert.equal(byId.get(runners[1].id)?.position?.lat, 40.8);
+
+  // An exposed runner stays live instead of freezing at the last ping.
+  movePlayer(lobby, runners[1].id, 40.85, -74.001);
+  assert.equal(
+    lobby
+      .snapshotFor(hostId, false)
+      .players.find((player) => player.id === runners[1].id)?.position?.lat,
+    40.85,
+  );
+
+  // Stepping back inside the boundary hides them again.
+  movePlayer(lobby, runners[1].id, 40.701, -74);
+  const back = lobby.snapshotFor(hostId, false);
+  assert.equal(
+    back.players.find((player) => player.id === runners[1].id)?.exposed,
+    false,
+  );
+  assert.equal(
+    back.players.find((player) => player.id === runners[1].id)?.position,
+    undefined,
+  );
+});
+
+test("a shrinking zone exposes a runner once the boundary passes them", () => {
+  const { lobby, hostId } = lobbyWithPlayers(1);
+  const runner = [...lobby.players.values()].find(
+    (player) => player.role === "runner",
+  )!;
+
+  lobby.handle(hostId, {
+    type: "updateSettings",
+    settings: {
+      zoneEnabled: true,
+      playAreaM: 400,
+      zoneFinalRadiusM: 100,
+      zoneShrinkStepM: 150,
+      zoneShrinkIntervalSec: 60,
+      pingSec: 3600,
+    },
+  });
+  deploy(lobby, hostId);
+
+  movePlayer(lobby, hostId, 40.7, -74);
+  movePlayer(lobby, runner.id, 40.7027, -74);
+
+  const inside = lobby
+    .snapshotFor(hostId, false)
+    .players.find((player) => player.id === runner.id);
+  assert.equal(inside?.exposed, false);
+  assert.equal(inside?.position, undefined);
+
+  const realNow = Date.now;
+  Date.now = () => realNow() + 90_000;
+  try {
+    const exposed = lobby
+      .snapshotFor(hostId, false)
+      .players.find((player) => player.id === runner.id);
+    assert.equal(exposed?.exposed, true);
+    assert.equal(exposed?.position?.lat, 40.7027);
+  } finally {
+    Date.now = realNow;
+  }
 });
 
 test("runners see their squad and the nearest hunter bearing", () => {

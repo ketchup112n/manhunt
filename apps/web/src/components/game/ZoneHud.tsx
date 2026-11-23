@@ -185,8 +185,8 @@ export function ZoneRuleNote({ tone = "runner" }: { tone?: "hunter" | "runner" }
       {formatRadius(zone.finalRadiusM, units)}, losing {zone.shrinkStepM} m every{" "}
       {Math.round(zone.intervalSec / 60)} min.
       {tone === "runner"
-        ? " Stay inside the boundary or be caught in the open."
-        : " The zone forces runners into tighter pockets."}
+        ? " Stay inside the boundary: leave the play area and hunters see your live position until you return."
+        : " Runners outside the boundary stay live on your map until they return."}
     </p>
   );
 }

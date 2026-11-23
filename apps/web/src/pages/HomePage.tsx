@@ -19,7 +19,7 @@ const steps = [
     index: "02",
     icon: Navigation,
     title: "Runners hold the line",
-    body: "A live field map keeps your squad and the caught sites in view, with a facing arrow on your own marker. Stay out of reach, keep moving, and survive the round.",
+    body: "A live field map keeps your squad and the caught sites in view, with a facing arrow on your own marker. Stay out of reach, keep moving, and stay inside the play area — step outside and hunters see your live location until you return.",
     meta: "Directional awareness",
     tone: "runner" as const,
   },

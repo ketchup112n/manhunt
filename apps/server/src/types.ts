@@ -70,6 +70,11 @@ export interface PublicPlayer {
   avatar: string;
   connected: boolean;
   tagCode?: string;
+  /**
+   * True while this runner is outside the live play area. Hunters can see an
+   * exposed runner's location for as long as the flag stays set.
+   */
+  exposed: boolean;
   /** Present only when this viewer is allowed to see the player's location. */
   position?: GeoPosition;
 }

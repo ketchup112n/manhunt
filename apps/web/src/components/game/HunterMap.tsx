@@ -175,7 +175,10 @@ export function HunterMap({
           <Marker
             key={`${runner.id}-${pingKey}`}
             position={[runner.lat, runner.lng]}
-            icon={createPlayerMarkerIcon("runner", runner.name, { ping: true })}
+            icon={createPlayerMarkerIcon("runner", runner.name, {
+              ping: !runner.exposed,
+              exposed: runner.exposed,
+            })}
           />
         ))}
         <MapControls home={focus} />

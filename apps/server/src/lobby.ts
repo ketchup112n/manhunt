@@ -13,6 +13,7 @@ import {
   type TagResult,
   type Winner,
 } from "./types.ts";
+import { currentZoneRadiusM } from "./zone.ts";
 
 const BOT_NAMES = [
   "LYNX",
@@ -770,9 +771,32 @@ export class Lobby {
     const pingOpen = this.phase === "active" && this.pingExpiresAt > now;
 
     /**
+     * Runners who have left the live play area. Their position stays visible
+     * to hunters until they step back inside (or are tagged).
+     */
+    const exposedRunnerIds = new Set<string>();
+    if (this.phase === "active" && this.center) {
+      const elapsedSec = Math.max(0, (now - this.startedAt) / 1000);
+      const radiusM = currentZoneRadiusM(this.settings, elapsedSec);
+      for (const player of this.players.values()) {
+        if (
+          player.role !== "runner" ||
+          player.status !== "active" ||
+          !player.position
+        ) {
+          continue;
+        }
+        if (distanceMeters(this.center, player.position) > radiusM) {
+          exposedRunnerIds.add(player.id);
+        }
+      }
+    }
+
+    /**
      * Location visibility is decided per viewer:
      * - you always see yourself;
-     * - hunters see their own team and runners only inside a ping window;
+     * - hunters see their own team, runners inside a ping window, and any
+     *   runner who is outside the play area (live, until they return);
      * - runners see their squad and hunters inside a ping window, or at all
      *   times when the host enables all-hunter intel;
      * - caught runners and unassigned players never share a location.
@@ -786,8 +810,10 @@ export class Lobby {
         if (player.role === "hunter") {
           return this.settings.showHunterTeammates ? player.position : undefined;
         }
-        if (player.role === "runner" && pingOpen) {
-          return this.pingPositions.get(player.id);
+        if (player.role === "runner") {
+          // An exposed runner is tracked live; the ping snapshot is frozen.
+          if (exposedRunnerIds.has(player.id)) return player.position;
+          if (pingOpen) return this.pingPositions.get(player.id);
         }
         return undefined;
       }
@@ -816,6 +842,7 @@ export class Lobby {
       connected: player.isBot || player.connected,
       tagCode:
         includeAllPins || player.id === viewerId ? player.tagCode : undefined,
+      exposed: exposedRunnerIds.has(player.id),
       position: visiblePosition(player),
     }));
 

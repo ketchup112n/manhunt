@@ -140,7 +140,7 @@ Make sure the platform forwards WebSocket upgrades to the same port.
 3. Players open **Join**, enter the code and a name. They appear under **Standby** until the host assigns them.
 4. The host moves players between **Hunters** and **Runners** with the team buttons or drag-and-drop, or presses **Randomize & deploy**.
 5. **Randomize & deploy** shuffles the teams and immediately deploys: every phone shows the same ten-second reveal, each player flips to their own role in the last four seconds, then the prep countdown starts. **Start with assigned teams** (manual teams) runs the same reveal.
-6. During the round, the server fires pings on schedule. Hunters see last-known runner positions for ten seconds after each ping.
+6. During the round, the server fires pings on schedule. Hunters see last-known runner positions for ten seconds after each ping. A runner who leaves the live play area is exposed continuously: hunters see their live position until they step back inside or are caught.
 7. A hunter asks a caught runner for their four-digit PIN and enters it. The server validates the PIN, marks the runner caught, freezes a catch marker at their last fix, and moves them to spectator mode.
 8. The round ends when time expires, every runner is caught, or the host ends it early.
 
@@ -160,7 +160,7 @@ The dev console (right-edge **Demo** tab, development builds only) can fill the 
 - In development, `npm run dev` sets `MANHUNT_DEV_PINS=true`, so the demo console can show every PIN. The production `start` script leaves the flag off.
 - Session tokens are bearer credentials for the socket; they are not passwords and are only stored locally.
 - Location is requested only while the round is in prep or active. The server never asks for a fix before the host deploys.
-- Visibility is enforced server-side: you always see yourself; hunters see hunter teammates and runners only during a ten-second ping window; runners see their squad and, when the host enables all-hunter intel, anonymous hunter markers. Unassigned players never share a position.
+- Visibility is enforced server-side: you always see yourself; hunters see hunter teammates, runners during a ten-second ping window, and any runner outside the play area (tracked live until they return); runners see their squad and, when the host enables all-hunter intel, anonymous hunter markers. Unassigned players never share a position.
 - Spectators stay on their own map with their squad and catch markers, but the server never returns their position to other players and they are not counted toward the round result. Caught runners keep a private self-only fix for their spectator map.
 - The arena center is anchored from the host's fix, then the first available fix, then the first fix received during prep or the round.
 - Teams and settings are host-controlled. The server rejects team changes, rule edits, and early endings from other players.
@@ -173,7 +173,7 @@ When enabled, the play area behaves like a battle-royale circle. Each interval i
 - It then contracts linearly to the next radius over the remaining 20%.
 - The zone never drops below the configured final radius and stops moving once every contraction is complete.
 
-The same schedule powers the settings summary, the lobby schedule warning, the map circles, the in-field zone chip/panel, and the unit tests in `apps/web/src/lib/zone.test.ts`. If the schedule would run past the end of the round, the host sees a warning before deploying.
+The same schedule powers the settings summary, the lobby schedule warning, the map circles, the in-field zone chip/panel, and the unit tests in `apps/web/src/lib/zone.test.ts`. The server mirrors the live radius in `apps/server/src/zone.ts` to decide when a runner is outside the boundary, and exposes that runner's live position to hunters until they return. If the schedule would run past the end of the round, the host sees a warning before deploying.
 
 ## API
 

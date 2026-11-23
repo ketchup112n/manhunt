@@ -47,6 +47,8 @@ export interface Player {
   /** Only present for the player who owns the PIN (and dev snapshots). */
   tagCode?: string;
   connected: boolean;
+  /** True while this runner is outside the play area and tracked live. */
+  exposed: boolean;
   /** Present only when this viewer is allowed to see the player's location. */
   position?: GeoPosition;
 }
@@ -69,6 +71,8 @@ export interface RunnerSignal extends LatLng {
   name: string;
   accuracyM: number;
   seenAt: number;
+  /** Runner is outside the play area and tracked live. */
+  exposed: boolean;
 }
 
 export interface Preferences {
