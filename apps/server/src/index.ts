@@ -323,7 +323,8 @@ function serveStatic(pathname: string, response: ServerResponse): void {
   const ext = extname(file).toLowerCase();
   // Vite emits content-hashed filenames under /assets, so they can be cached
   // forever. Anything else (favicon, og-image, manifest) gets a shorter TTL.
-  const hashedAsset = relative.startsWith("assets/");
+  const hashedAsset =
+    relative.startsWith("/assets/") || relative.startsWith("assets/");
   const cacheControl =
     ext === ".html"
       ? "no-cache"
