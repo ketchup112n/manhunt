@@ -321,9 +321,21 @@ function serveStatic(pathname: string, response: ServerResponse): void {
   }
 
   const ext = extname(file).toLowerCase();
+  // Vite emits content-hashed filenames under /assets, so they can be cached
+  // forever. Anything else (favicon, og-image, manifest) gets a shorter TTL.
+  const hashedAsset = relative.startsWith("assets/");
+  const cacheControl =
+    ext === ".html"
+      ? "no-cache"
+      : hashedAsset
+        ? "public, max-age=31536000, immutable"
+        : "public, max-age=86400";
   response.writeHead(200, {
     "content-type": MIME[ext] ?? "application/octet-stream",
-    "cache-control": ext === ".html" ? "no-cache" : "public, max-age=31536000",
+    "cache-control": cacheControl,
+    // Let Cloudflare cache at the edge even when the zone's default rules are
+    // conservative; harmless if the zone already caches.
+    "cloudflare-cdn-cache-control": ext === ".html" ? "no-cache" : cacheControl,
   });
   createReadStream(file).pipe(response);
 }

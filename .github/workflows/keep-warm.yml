@@ -1,0 +1,38 @@
+name: keep-warm
+
+# Render's free tier sleeps a service after ~15 minutes without traffic, which
+# makes the next visit wait through a cold start. This scheduled ping keeps the
+# production service awake. The client also shows a "waking" state and retries,
+# so a missed ping still degrades gracefully.
+#
+# Scheduled workflows only run from the repository's default branch.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping health endpoint
+        run: |
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /dev/null -m 20 -w "%{http_code}" https://themanhunt.in/api/health || true)
+            echo "attempt ${attempt}: HTTP ${code}"
+            if [ "${code}" = "200" ]; then
+              exit 0
+            fi
+            sleep 15
+          done
+          # Never fail the job: a missed ping is not an error worth an alert.
+          echo "health check did not return 200; will retry on the next schedule"

@@ -93,7 +93,7 @@ The repo includes `render.yaml`. Either:
 
 `render.yaml` already sets these values and disables debug PINs. Change the branch if you deploy from `main`.
 
-Render's free plan works for testing. It sleeps after a period of inactivity, so the first request after a break takes a few seconds to wake. Lobbies are held in memory and are lost whenever the service restarts or redeploys.
+Render's free plan works for testing. It sleeps after a period of inactivity, so the first request after a break takes a few seconds to wake. Lobbies are held in memory and are lost whenever the service restarts or redeploys. A scheduled GitHub Actions workflow (`.github/workflows/keep-warm.yml`) pings `/api/health` every ten minutes to keep the free instance warm, and the client shows a "waking" state with retry if a request still hits a cold start.
 
 ### Other hosts
 
@@ -226,9 +226,9 @@ apps/
 - **No accounts or persistence.** Lobbies live in server memory and disappear after six idle hours or a server restart. A restart requires players to join again.
 - **GPS and facing need permission and HTTPS.** The browser geolocation API streams precise fixes to the server during prep and the active round. Denied or unavailable fixes surface as an in-game banner. The facing arrow needs device orientation access, which iOS only grants after a gesture; the app asks on your first tap on the field page and remembers the choice.
 - **No pressure testing.** One process, in-memory state, and no rate limiting; suitable for a friend-group game, not a public deployment.
-- **Map tiles require network access.** Leaflet renders OpenStreetMap tiles with a CSS filter for the dark theme.
+- **Map tiles require network access.** Leaflet renders OpenStreetMap tiles in light mode and Stadia Maps Alidade Smooth Dark in dark mode.
 - **Basic resilience only.** The client reconnects with backoff, but the host keeps their role while offline and there is no host migration during a round.
-- **Dev console is dev-only.** It is gated behind `import.meta.env.DEV` and absent from production builds.
+- **Demo console is passcode-gated.** The prototype controls ship in production but stay hidden until the access code is entered.
 
 ## Next steps
 

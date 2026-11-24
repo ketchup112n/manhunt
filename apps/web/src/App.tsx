@@ -11,10 +11,8 @@ import {
 } from "react-router-dom";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
-import { DevPanel } from "@/components/game/DevPanel";
 import { LocationSync } from "@/components/game/LocationSync";
 import { LocationGate } from "@/components/game/LocationGate";
-import { RoleRevealOverlay } from "@/components/game/RoleRevealOverlay";
 import { usePreferences } from "@/store/preferences";
 import { useGame, useYou } from "@/store/game";
 import { HomePage } from "@/pages/HomePage";
@@ -29,6 +27,17 @@ const RunnerPage = lazy(() => import("@/pages/RunnerPage").then((m) => ({ defaul
 const SpectatorPage = lazy(() => import("@/pages/SpectatorPage").then((m) => ({ default: m.SpectatorPage })));
 const ResultsPage = lazy(() => import("@/pages/ResultsPage").then((m) => ({ default: m.ResultsPage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+
+// Both are always mounted but only matter mid-round, so keep the motion
+// library they use out of the entry bundle.
+const DevPanel = lazy(() =>
+  import("@/components/game/DevPanel").then((m) => ({ default: m.DevPanel })),
+);
+const RoleRevealOverlay = lazy(() =>
+  import("@/components/game/RoleRevealOverlay").then((m) => ({
+    default: m.RoleRevealOverlay,
+  })),
+);
 
 function LoadingFallback() {
   return (
@@ -257,8 +266,12 @@ export function App() {
         </Routes>
         <RemovalNotice />
         <LocationGate />
-        <RoleRevealOverlay />
-        <DevPanel />
+        <Suspense fallback={null}>
+          <RoleRevealOverlay />
+        </Suspense>
+        <Suspense fallback={null}>
+          <DevPanel />
+        </Suspense>
       </BrowserRouter>
     </ToastProvider>
   );

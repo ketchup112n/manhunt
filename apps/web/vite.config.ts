@@ -17,7 +17,7 @@ export default defineConfig({
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           "vendor-leaflet": ["leaflet", "react-leaflet"],
           "vendor-motion": ["motion"],
-          "vendor-ui": ["lucide-react", "clsx", "tailwind-merge", "zustand", "qrcode.react"],
+          "vendor-ui": ["lucide-react", "clsx", "tailwind-merge", "zustand"],
         },
       },
     },
