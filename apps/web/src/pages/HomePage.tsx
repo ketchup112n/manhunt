@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight, Crosshair, Radar, Navigation, Fingerprint } from "lucide-react";
+import { ArrowUpRight, Crosshair, FlaskConical, Radar, Navigation, Fingerprint } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { RadarPanel } from "@/components/game/RadarPanel";
 import { buttonStyles } from "@/components/ui/Button";
@@ -36,7 +36,18 @@ const steps = [
 export function HomePage() {
   return (
     <div className="flex min-h-dvh flex-col">
-      <TopBar right={<Chip tone="runner" dot className="hidden sm:inline-flex">Realtime</Chip>} />
+      <TopBar
+        right={
+          <div className="flex items-center gap-1.5">
+            <Chip tone="warning" className="gap-1">
+              Beta
+            </Chip>
+            <Chip tone="runner" dot className="hidden sm:inline-flex">
+              Realtime
+            </Chip>
+          </div>
+        }
+      />
 
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 sm:px-6">
         <div className="flex items-center justify-between gap-3 border-y border-line/60 py-2.5 font-mono text-[8px] uppercase tracking-[0.2em] text-faint">
@@ -78,6 +89,15 @@ export function HomePage() {
               <Link to="/join" className={buttonStyles("secondary", "lg", "sm:min-w-[190px]")}>
                 Join with code
               </Link>
+            </div>
+
+            <div className="mt-6 flex max-w-md items-start gap-2.5 border-l-2 border-warning/50 pl-3">
+              <FlaskConical className="mt-0.5 size-3.5 shrink-0 text-warning" />
+              <p className="font-mono text-[9px] uppercase leading-relaxed tracking-[0.14em] text-faint">
+                <span className="text-warning">Beta release.</span> The game is in
+                active development, so expect rough edges, balance changes, and
+                the occasional reset.
+              </p>
             </div>
 
             <div className="mt-9 grid max-w-md grid-cols-3 divide-x divide-line border-t border-line pt-4">
@@ -157,7 +177,7 @@ export function HomePage() {
 
       <footer className="relative z-10 border-t border-line/70">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-4 font-mono text-[8px] uppercase tracking-[0.16em] text-faint sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>Manhunt / realtime lobby 0.2</span>
+          <span>Manhunt / realtime lobby 0.2 beta</span>
           <span className="text-faint/80">Play outdoors. Stay aware. Respect the city.</span>
         </div>
       </footer>
