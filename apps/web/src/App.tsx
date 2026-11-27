@@ -13,6 +13,7 @@ import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { LocationSync } from "@/components/game/LocationSync";
 import { LocationGate } from "@/components/game/LocationGate";
+import { PresenceSync } from "@/components/layout/Presence";
 import { usePreferences } from "@/store/preferences";
 import { useGame, useYou } from "@/store/game";
 import { HomePage } from "@/pages/HomePage";
@@ -179,6 +180,7 @@ export function App() {
       <ThemeSync />
       <RealtimeSync />
       <LocationSync />
+      <PresenceSync />
       <BrowserRouter>
         <ScrollToTop />
         <Routes>

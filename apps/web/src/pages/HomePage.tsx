@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Crosshair, FlaskConical, Radar, Navigation, Fingerprint } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
+import { PresenceBadge } from "@/components/layout/Presence";
 import { RadarPanel } from "@/components/game/RadarPanel";
 import { buttonStyles } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -39,11 +40,9 @@ export function HomePage() {
       <TopBar
         right={
           <div className="flex items-center gap-1.5">
-            <Chip tone="warning" className="gap-1">
+            <PresenceBadge />
+            <Chip tone="warning" className="hidden gap-1 sm:inline-flex">
               Beta
-            </Chip>
-            <Chip tone="runner" dot className="hidden sm:inline-flex">
-              Realtime
             </Chip>
           </div>
         }

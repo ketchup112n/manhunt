@@ -25,6 +25,20 @@ const LOBBY_IDLE_MS = 6 * 60 * 60 * 1000;
 const lobbies = new Map<string, Lobby>();
 const lastActivity = new Map<string, number>();
 
+/**
+ * Lightweight presence tracking for the "N online" label. Each open tab sends
+ * a heartbeat with a random id; ids expire after PRESENCE_TTL_MS. Only a
+ * timestamp is stored, so no personal data is kept.
+ */
+const PRESENCE_TTL_MS = 40_000;
+const presence = new Map<string, number>();
+
+function prunePresence(now = Date.now()): void {
+  for (const [id, seenAt] of presence) {
+    if (now - seenAt > PRESENCE_TTL_MS) presence.delete(id);
+  }
+}
+
 interface SocketContext {
   lobby: Lobby;
   playerId: string;
@@ -163,6 +177,29 @@ async function handleApi(
         0,
       ),
     });
+    return true;
+  }
+
+  if (url.pathname === "/api/presence") {
+    const now = Date.now();
+    if (request.method === "POST") {
+      const body = (await readJson(request)) as {
+        id?: unknown;
+        leave?: unknown;
+      };
+      const id = String(body.id ?? "").trim().slice(0, 64);
+      if (!id) {
+        json(response, 400, { error: "A presence id is required." });
+        return true;
+      }
+      if (body.leave === true) {
+        presence.delete(id);
+      } else {
+        presence.set(id, now);
+      }
+    }
+    prunePresence(now);
+    json(response, 200, { online: presence.size });
     return true;
   }
 
@@ -511,6 +548,8 @@ const ticker = setInterval(() => {
       lastActivity.delete(code);
     }
   }
+
+  prunePresence(now);
 }, 1000);
 
 server.listen(PORT, HOST, () => {
