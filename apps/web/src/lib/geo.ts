@@ -80,31 +80,28 @@ export function formatAgo(seconds: number): string {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s ago`;
 }
 
-export const DEMO_CENTER = { lat: 40.7829, lng: -73.9654 };
-
-// Unified mock positions for all players (used regardless of assigned role)
-export const MOCK_PLAYER_POSITIONS = [
-  { id: "you", name: "ECHO", lat: 40.7829, lng: -73.9654 },
-  { id: "vex", name: "VEX", lat: 40.7841, lng: -73.9637 },
-  { id: "kilo", name: "KILO", lat: 40.7809, lng: -73.9681 },
-  { id: "wren", name: "WREN", lat: 40.7852, lng: -73.9601, accuracyM: 8 },
-  { id: "ash", name: "ASH", lat: 40.7798, lng: -73.9622, accuracyM: 12 },
-  { id: "rook", name: "ROOK", lat: 40.7871, lng: -73.9698, accuracyM: 6 },
-  { id: "nova", name: "NOVA", lat: 40.7783, lng: -73.9702, accuracyM: 18 },
-];
-
-export function getPlayerPosition(id: string) {
-  return MOCK_PLAYER_POSITIONS.find((p) => p.id === id);
+export interface PositionedPlayer extends LatLng {
+  id: string;
+  name: string;
+  accuracyM: number;
+  updatedAt: number;
 }
 
-export function getHunterPositions(players: { id: string }[]) {
-  const hunterIds = new Set(players.map((p) => p.id));
-  return MOCK_PLAYER_POSITIONS.filter((pos) => hunterIds.has(pos.id));
-}
-
-export function getRunnerPositions(players: { id: string }[]) {
-  const runnerIds = new Set(players.map((p) => p.id));
-  return MOCK_PLAYER_POSITIONS.filter((pos) => runnerIds.has(pos.id));
+/** Flatten a player's last server-known fix into something a map can render. */
+export function toPositionedPlayer(player: {
+  id: string;
+  name: string;
+  position?: { lat: number; lng: number; accuracyM: number; at: number };
+}): PositionedPlayer | null {
+  if (!player.position) return null;
+  return {
+    id: player.id,
+    name: player.name,
+    lat: player.position.lat,
+    lng: player.position.lng,
+    accuracyM: player.position.accuracyM,
+    updatedAt: player.position.at,
+  };
 }
 
 export function nearestHunter(

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight, Crosshair, Radar, Compass, Fingerprint } from "lucide-react";
+import { ArrowUpRight, Crosshair, FlaskConical, Radar, Navigation, Fingerprint } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
+import { PresenceBadge } from "@/components/layout/Presence";
 import { RadarPanel } from "@/components/game/RadarPanel";
 import { buttonStyles } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -10,16 +11,16 @@ const steps = [
   {
     index: "01",
     icon: Radar,
-    title: "Hunters receive pings",
-    body: "Runner coordinates are revealed at set intervals. Between pings, the hunters are blind — and the clock is against them.",
+    title: "Pings expose both sides",
+    body: "Runner coordinates are revealed at set intervals — and hunters are exposed to runners for the same window. Between pings, both sides go dark.",
     meta: "Location intelligence",
     tone: "hunter" as const,
   },
   {
     index: "02",
-    icon: Compass,
+    icon: Navigation,
     title: "Runners hold the line",
-    body: "A live compass points toward the nearest hunter with distance. Stay out of reach, keep moving, and survive the round.",
+    body: "A live field map keeps your squad and the caught sites in view, with a facing arrow on your own marker. Stay out of reach, keep moving, and stay inside the play area — step outside and hunters see your live location until you return.",
     meta: "Directional awareness",
     tone: "runner" as const,
   },
@@ -36,10 +37,19 @@ const steps = [
 export function HomePage() {
   return (
     <div className="flex min-h-dvh flex-col">
-      <TopBar right={<Chip tone="runner" dot className="hidden sm:inline-flex">Prototype</Chip>} />
+      <TopBar
+        right={
+          <div className="flex items-center gap-1.5">
+            <PresenceBadge />
+            <Chip tone="warning" className="hidden gap-1 sm:inline-flex">
+              Beta
+            </Chip>
+          </div>
+        }
+      />
 
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 sm:px-6">
-        <div className="flex items-center justify-between border-y border-line/60 py-2.5 font-mono text-[8px] uppercase tracking-[0.2em] text-faint">
+        <div className="flex items-center justify-between gap-3 border-y border-line/60 py-2.5 font-mono text-[8px] uppercase tracking-[0.2em] text-faint">
           <span className="flex items-center gap-2">
             <span className="size-1.5 animate-soft-pulse rounded-full bg-runner" />
             System online
@@ -49,13 +59,13 @@ export function HomePage() {
         </div>
 
         <section className="grid flex-1 items-center gap-10 py-10 sm:py-14 lg:grid-cols-[1.08fr_0.92fr] lg:gap-12 lg:py-16">
-          <div className="animate-rise">
+          <div className="min-w-0 animate-rise">
             <div className="mb-6 flex items-center gap-3">
               <span className="h-px w-8 bg-runner" />
               <span className="label-mono text-runner">Real-world pursuit protocol</span>
             </div>
 
-            <h1 className="display text-[clamp(4.4rem,15vw,9.5rem)] font-bold leading-[0.78] tracking-[-0.025em] text-ink">
+            <h1 className="display text-[clamp(3.8rem,15vw,9.5rem)] font-bold leading-[0.78] tracking-[-0.025em] text-ink">
               Hide.
               <br />
               Run.
@@ -64,9 +74,10 @@ export function HomePage() {
             </h1>
 
             <p className="mt-7 max-w-md text-[15px] leading-relaxed text-muted sm:text-base">
-              A live game of hide and seek across the real world. Hunters get
-              periodic location pings. Runners get a compass. The city decides
-              the rest.
+              A live game of hide and seek across the real world. Every location
+              ping exposes both teams — hunters track runners, runners track
+              hunters. Plus a live field map with a facing arrow. The city
+              decides the rest.
             </p>
 
             <div className="mt-8 flex flex-col gap-2.5 sm:flex-row">
@@ -77,6 +88,15 @@ export function HomePage() {
               <Link to="/join" className={buttonStyles("secondary", "lg", "sm:min-w-[190px]")}>
                 Join with code
               </Link>
+            </div>
+
+            <div className="mt-6 flex max-w-md items-start gap-2.5 border-l-2 border-warning/50 pl-3">
+              <FlaskConical className="mt-0.5 size-3.5 shrink-0 text-warning" />
+              <p className="font-mono text-[9px] uppercase leading-relaxed tracking-[0.14em] text-faint">
+                <span className="text-warning">Beta release.</span> The game is in
+                active development, so expect rough edges, balance changes, and
+                the occasional reset.
+              </p>
             </div>
 
             <div className="mt-9 grid max-w-md grid-cols-3 divide-x divide-line border-t border-line pt-4">
@@ -95,7 +115,7 @@ export function HomePage() {
             </div>
           </div>
 
-          <div className="relative animate-rise pb-2 lg:pb-0">
+          <div className="relative min-w-0 animate-rise pb-2 lg:pb-0">
             <div className="absolute left-1/2 top-0 hidden -translate-x-1/2 -translate-y-6 items-center gap-2 font-mono text-[8px] uppercase tracking-[0.22em] text-faint lg:flex">
               <Crosshair className="size-3" />
               Field preview
@@ -156,7 +176,7 @@ export function HomePage() {
 
       <footer className="relative z-10 border-t border-line/70">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-4 font-mono text-[8px] uppercase tracking-[0.16em] text-faint sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>Manhunt / UI prototype 0.1</span>
+          <span>Manhunt / realtime lobby 0.2 beta</span>
           <span className="text-faint/80">Play outdoors. Stay aware. Respect the city.</span>
         </div>
       </footer>

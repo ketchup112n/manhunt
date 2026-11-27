@@ -375,6 +375,24 @@ input[type="range"].hud-range::-moz-range-thumb {
   }
 }
 
+/* Minecraft-style splash beside the wordmark: rests, then pops every few seconds. */
+@keyframes splash-pulse {
+  0%,
+  84%,
+  100% {
+    transform: rotate(-6deg) scale(1);
+  }
+  88% {
+    transform: rotate(-6deg) scale(1.07);
+  }
+  93% {
+    transform: rotate(-6deg) scale(0.98);
+  }
+  97% {
+    transform: rotate(-6deg) scale(1.02);
+  }
+}
+
 @keyframes drift {
   0% {
     transform: translate3d(0, 0, 0) scale(1);
@@ -385,6 +403,37 @@ input[type="range"].hud-range::-moz-range-thumb {
   100% {
     transform: translate3d(0, 0, 0) scale(1);
   }
+}
+
+/* Toasts use CSS instead of a motion library so the entry bundle stays small. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+}
+
+.toast-enter {
+  animation: toast-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.toast-leave {
+  animation: toast-out 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .animate-spin-slow {
@@ -405,6 +454,18 @@ input[type="range"].hud-range::-moz-range-thumb {
 
 .animate-flicker {
   animation: flicker 5s linear infinite;
+}
+
+.logo-splash {
+  transform: rotate(-6deg);
+  transform-origin: bottom left;
+  text-shadow: 0 0 20px color-mix(in srgb, var(--runner) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .logo-splash {
+    animation: splash-pulse 7s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  }
 }
 
 .animate-drift {
@@ -438,14 +499,6 @@ input[type="range"].hud-range::-moz-range-thumb {
   width: 100%;
   background: var(--map-bg);
   font-family: var(--font-sans);
-}
-
-[data-theme="dark"] .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.15) saturate(0.55);
-}
-
-[data-theme="light"] .leaflet-tile-pane {
-  filter: saturate(0.62) contrast(0.92) brightness(1.03);
 }
 
 .leaflet-control-attribution {
@@ -557,6 +610,49 @@ input[type="range"].hud-range::-moz-range-thumb {
   color: var(--runner);
 }
 
+.player-marker--caught .player-marker__avatar {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 24%, var(--surface));
+  color: var(--danger);
+  font-size: 13px;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--danger) 68%, transparent),
+    0 4px 14px rgb(0 0 0 / 0.55),
+    0 0 22px color-mix(in srgb, var(--danger) 28%, transparent);
+}
+
+.player-marker--caught .player-marker__label {
+  color: var(--danger);
+}
+
+.player-marker__heading {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  z-index: 4;
+  width: 48px;
+  height: 48px;
+  pointer-events: none;
+  color: var(--runner);
+  transform: translate(-50%, -50%) rotate(var(--heading, 0deg));
+  transform-origin: 50% 50%;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--runner) 70%, transparent));
+}
+
+.player-marker__heading svg {
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  display: block;
+  width: 11px;
+  height: 11px;
+  transform: translateX(-50%);
+  fill: currentColor;
+  stroke: color-mix(in srgb, var(--canvas) 80%, transparent);
+  stroke-width: 0.75;
+  paint-order: stroke fill;
+}
+
 .player-marker__ping {
   position: absolute;
   top: -5px;
@@ -566,6 +662,31 @@ input[type="range"].hud-range::-moz-range-thumb {
   border-radius: 50%;
   border: 1.5px solid var(--runner);
   animation: ping-ring 1.4s ease-out infinite;
+}
+
+.player-marker--exposed .player-marker__avatar {
+  background: color-mix(in srgb, var(--warning) 24%, var(--surface));
+  color: var(--warning);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--warning) 78%, transparent),
+    0 4px 14px rgb(0 0 0 / 0.55),
+    0 0 26px color-mix(in srgb, var(--warning) 38%, transparent);
+}
+
+.player-marker--exposed .player-marker__label {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 55%, transparent);
+}
+
+.player-marker__exposed {
+  position: absolute;
+  top: -5px;
+  left: calc(50% - 21px);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--warning);
+  animation: ping-ring 1.8s ease-out infinite;
 }
 
 /* ---------- custom scrollbar ---------- */

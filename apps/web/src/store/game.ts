@@ -1,331 +1,798 @@
 import { create } from "zustand";
+import { useMemo } from "react";
 import {
   DEFAULT_SETTINGS,
+  type CaughtSpot,
+  type ClientMessage,
   type GamePhase,
   type GameSettings,
+  type GeoPosition,
+  type LatLng,
+  type LobbySession,
   type Player,
   type Role,
+  type ServerMessage,
+  type Snapshot,
   type TagState,
   type Winner,
 } from "@/lib/types";
+import { computeZoneState, type ZoneState } from "@/lib/zone";
+import { revealDeadline } from "@/lib/reveal";
 
-const INITIAL_PLAYERS: Player[] = [
-  {
-    id: "you",
-    name: "ECHO",
-    role: "hunter",
-    isYou: true,
-    isHost: true,
-    ready: true,
-    status: "active",
-    avatar: "EC",
-    tagCode: "2048",
-  },
-  {
-    id: "vex",
-    name: "VEX",
-    role: "hunter",
-    isYou: false,
-    isHost: false,
-    ready: true,
-    status: "active",
-    avatar: "VX",
-    tagCode: "7315",
-  },
-  {
-    id: "kilo",
-    name: "KILO",
-    role: "hunter",
-    isYou: false,
-    isHost: false,
-    ready: true,
-    status: "active",
-    avatar: "KL",
-    tagCode: "9182",
-  },
-  {
-    id: "wren",
-    name: "WREN",
-    role: "runner",
-    isYou: false,
-    isHost: false,
-    ready: true,
-    status: "active",
-    avatar: "WR",
-    tagCode: "4821",
-  },
-  {
-    id: "ash",
-    name: "ASH",
-    role: "runner",
-    isYou: false,
-    isHost: false,
-    ready: true,
-    status: "active",
-    avatar: "AS",
-    tagCode: "7390",
-  },
-  {
-    id: "rook",
-    name: "ROOK",
-    role: "runner",
-    isYou: false,
-    isHost: false,
-    ready: true,
-    status: "active",
-    avatar: "RK",
-    tagCode: "1156",
-  },
-  {
-    id: "nova",
-    name: "NOVA",
-    role: "runner",
-    isYou: false,
-    isHost: false,
-    ready: true,
-    status: "active",
-    avatar: "NV",
-    tagCode: "6204",
-  },
-];
+const SESSION_KEY = "manhunt-session";
+const NAME_KEY = "manhunt-name";
+
+export type ConnectionState =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "waking";
+
+export type PositionStatus =
+  | "idle"
+  | "requesting"
+  | "live"
+  | "denied"
+  | "unsupported"
+  | "error";
+
+export type LocationPermission =
+  | "unknown"
+  | "granted"
+  | "denied"
+  | "unsupported";
+
+interface ActionResult {
+  ok: boolean;
+  error?: string;
+  code?: string;
+}
 
 interface GameStore {
   code: string;
-  gameName: string;
   phase: GamePhase;
   settings: GameSettings;
   players: Player[];
+  session: LobbySession | null;
+  connection: ConnectionState;
+  connectionError: string | null;
+  removalNotice: string | null;
+  bootstrapped: boolean;
+  draftName: string;
+  actionError: { message: string; at: number } | null;
   timeLeftSec: number;
+  revealEndsAt: number;
+  revealRemainingSec: number;
+  prepRemainingSec: number;
   nextPingSec: number;
   lastPingAgo: number;
   pingCount: number;
   pingExpiresAt: number;
   tagState: TagState;
   tagTargetId: string | null;
-  incomingTag: boolean;
-  incomingTagDeadline: number;
   resultWinner: Winner | null;
   deviceHeading: number;
+  center: LatLng | null;
+  nearestHunter: { bearing: number; distanceM: number; updatedAt: number } | null;
+  caughtSpots: CaughtSpot[];
+  /** Your own route this round; populated when the round ends. */
+  trail: LatLng[];
+  /** Metres travelled along the recorded trail. */
+  distanceM: number;
+  livePosition: GeoPosition | null;
+  positionStatus: PositionStatus;
+  positionError: string | null;
+  locationPermission: LocationPermission;
+  /** Arena centre selected on the create screen before a lobby exists. */
+  draftArena: LatLng | null;
 
-  setYouName: (name: string) => void;
-  setGameName: (name: string) => void;
-  /** Legacy preview action, retained until all old navigation affordances are removed. */
-  setRole: (role: Role) => void;
-  triggerIncomingTag: () => void;
-  respondIncomingTag: (accepted: boolean) => void;
+  bootstrap: () => void;
+  createLobby: (name: string, settings: GameSettings) => Promise<ActionResult>;
+  joinLobby: (code: string, name: string) => Promise<ActionResult>;
+  leaveLobby: () => void;
+  setDraftName: (name: string) => void;
+  setDraftArena: (center: LatLng | null) => void;
+  updateDraftSettings: (settings: Partial<GameSettings>) => void;
   updateSettings: (settings: Partial<GameSettings>) => void;
   assignPlayerRole: (id: string, role: Role) => void;
   randomizeTeams: () => void;
   setReady: (ready: boolean) => void;
   startGame: () => void;
-  tick: () => void;
+  skipPrep: () => void;
   triggerPing: () => void;
   submitTagCode: (code: string) => void;
   resetTag: () => void;
   endGame: (winner: Winner) => void;
+  kickPlayer: (playerId: string) => void;
+  rematch: () => void;
+  fillBots: (count?: number) => void;
+  removeBots: () => void;
   setDeviceHeading: (heading: number) => void;
+  setWaking: (waking: boolean) => void;
+  updateLocation: (lat: number, lng: number, accuracyM: number) => void;
+  setLivePosition: (position: GeoPosition) => void;
+  setPositionStatus: (status: PositionStatus, error?: string | null) => void;
+  setLocationPermission: (permission: LocationPermission) => void;
+  /** Prompt for location access with a direct fix request; resolves when granted. */
+  requestLocationAccess: () => Promise<boolean>;
   resetGame: () => void;
+  dismissReveal: () => void;
+  clearRemovalNotice: () => void;
+  clearActionError: () => void;
 }
 
 const initialState = {
-  code: "VX7K2M",
-  gameName: "MANHUNT",
+  code: "",
   phase: "lobby" as GamePhase,
   settings: DEFAULT_SETTINGS,
-  players: INITIAL_PLAYERS,
-  timeLeftSec: 2825,
-  nextPingSec: 206,
-  lastPingAgo: 94,
-  pingCount: 2,
+  players: [] as Player[],
+  session: null as LobbySession | null,
+  connection: "idle" as ConnectionState,
+  connectionError: null as string | null,
+  removalNotice: null as string | null,
+  bootstrapped: false,
+  draftName: "",
+  actionError: null as { message: string; at: number } | null,
+  timeLeftSec: DEFAULT_SETTINGS.durationSec,
+  revealEndsAt: 0,
+  revealRemainingSec: 0,
+  prepRemainingSec: 0,
+  nextPingSec: DEFAULT_SETTINGS.pingSec,
+  lastPingAgo: 0,
+  pingCount: 0,
   pingExpiresAt: 0,
   tagState: "idle" as TagState,
   tagTargetId: null as string | null,
-  incomingTag: false,
-  incomingTagDeadline: 0,
   resultWinner: null as Winner | null,
   deviceHeading: 24,
+  center: null as LatLng | null,
+  nearestHunter: null as {
+    bearing: number;
+    distanceM: number;
+    updatedAt: number;
+  } | null,
+  caughtSpots: [] as CaughtSpot[],
+  trail: [] as LatLng[],
+  distanceM: 0,
+  livePosition: null as GeoPosition | null,
+  positionStatus: "idle" as PositionStatus,
+  positionError: null as string | null,
+  locationPermission: "unknown" as LocationPermission,
+  draftArena: null as LatLng | null,
 };
 
-function catchTarget(players: Player[], id: string | null): Player[] {
-  if (!id) return players;
-  return players.map((p) => (p.id === id ? { ...p, status: "caught" } : p));
+let socket: WebSocket | null = null;
+let reconnectTimer: number | undefined;
+let reconnectAttempts = 0;
+let intentionalClose = false;
+let bootstrappedOnce = false;
+
+function readSession(): LobbySession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LobbySession>;
+    if (
+      typeof parsed.code === "string" &&
+      typeof parsed.playerId === "string" &&
+      typeof parsed.token === "string"
+    ) {
+      return {
+        code: parsed.code,
+        playerId: parsed.playerId,
+        token: parsed.token,
+      };
+    }
+  } catch {
+    // Corrupt storage is equivalent to no session.
+  }
+  return null;
 }
 
-export const useGame = create<GameStore>((set, get) => ({
-  ...initialState,
+function writeSession(session: LobbySession | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (session) {
+      window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    } else {
+      window.localStorage.removeItem(SESSION_KEY);
+    }
+  } catch {
+    // Storage may be unavailable in private mode.
+  }
+}
 
-  setYouName: (name) =>
-    set((state) => ({
-      players: state.players.map((p) =>
-        p.isYou
-          ? {
-              ...p,
-              name: name.toUpperCase().slice(0, 12),
-              avatar: name.slice(0, 2).toUpperCase() || "YO",
-            }
-          : p,
-      ),
-    })),
+function readName(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(NAME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
 
-  setGameName: (gameName) => set({ gameName: gameName.toUpperCase().slice(0, 24) }),
+function writeName(name: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(NAME_KEY, name);
+  } catch {
+    // Ignore storage failures.
+  }
+}
 
-  setRole: (role) => set((state) => ({
-    players: state.players.map((player) => player.isYou ? { ...player, role } : player),
-  })),
+function websocketUrl(session: LobbySession): string {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/ws?code=${encodeURIComponent(
+    session.code,
+  )}&token=${encodeURIComponent(session.token)}`;
+}
 
-  triggerIncomingTag: () => set({ incomingTag: true, incomingTagDeadline: Date.now() + 15_000 }),
+function clearReconnect(): void {
+  if (reconnectTimer !== undefined) {
+    window.clearTimeout(reconnectTimer);
+    reconnectTimer = undefined;
+  }
+}
 
-  respondIncomingTag: (accepted) => set((state) => ({
-    incomingTag: false,
-    players: accepted ? catchTarget(state.players, state.players.find((player) => player.isYou)?.id ?? null) : state.players,
-  })),
+function closeSocket(): void {
+  clearReconnect();
+  if (socket) {
+    intentionalClose = true;
+    socket.close();
+    socket = null;
+  }
+}
 
-  updateSettings: (settings) =>
-    set((state) => ({ settings: { ...state.settings, ...settings } })),
+function send(message: ClientMessage): boolean {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(message));
+    return true;
+  }
+  return false;
+}
 
-  assignPlayerRole: (id, role) =>
-    set((state) => ({
-      players: state.players.map((p) => (p.id === id ? { ...p, role } : p)),
-      tagState: "idle",
-      tagTargetId: null,
-    })),
+function actionError(message: string): { message: string; at: number } {
+  return { message, at: Date.now() };
+}
 
-  randomizeTeams: () =>
-    set((state) => {
-      const shuffled = [...state.players];
-      for (let index = shuffled.length - 1; index > 0; index -= 1) {
-        const swapIndex = Math.floor(Math.random() * (index + 1));
-        [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+/**
+ * Clears everything that belongs to a specific lobby session. Called before
+ * joining or creating a new lobby so a previous round can never leak its
+ * phase, settings or connection state into the next one.
+ */
+function freshRoundState() {
+  return {
+    code: "",
+    phase: "lobby" as GamePhase,
+    settings: DEFAULT_SETTINGS,
+    players: [] as Player[],
+    connection: "idle" as ConnectionState,
+    connectionError: null as string | null,
+    removalNotice: null as string | null,
+    actionError: null as { message: string; at: number } | null,
+    timeLeftSec: DEFAULT_SETTINGS.durationSec,
+    revealEndsAt: 0,
+    revealRemainingSec: 0,
+    prepRemainingSec: 0,
+    nextPingSec: DEFAULT_SETTINGS.pingSec,
+    lastPingAgo: 0,
+    pingCount: 0,
+    pingExpiresAt: 0,
+    tagState: "idle" as TagState,
+    tagTargetId: null as string | null,
+    resultWinner: null as Winner | null,
+    center: null as LatLng | null,
+    nearestHunter: null as {
+      bearing: number;
+      distanceM: number;
+      updatedAt: number;
+    } | null,
+    caughtSpots: [] as CaughtSpot[],
+    trail: [] as LatLng[],
+    distanceM: 0,
+    livePosition: null as GeoPosition | null,
+    positionStatus: "idle" as PositionStatus,
+    positionError: null as string | null,
+  };
+}
+
+const WAKE_TIMEOUT_MS = 3000;
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = (await response.json().catch(() => ({}))) as T & {
+    error?: string;
+  };
+  if (!response.ok) {
+    throw new Error(payload.error ?? "The server rejected the request.");
+  }
+  return payload;
+}
+
+export const useGame = create<GameStore>((set, get) => {
+  function applySnapshot(state: Snapshot): void {
+    const previous = get();
+    const now = Date.now();
+    set({
+      code: state.code,
+      phase: state.phase,
+      settings: state.settings,
+      players: state.players.map((player) => ({
+        ...player,
+        isYou: player.id === state.youId,
+      })),
+      timeLeftSec: state.timeLeftSec,
+      revealEndsAt: revealDeadline({
+        previousPhase: previous.phase,
+        phase: state.phase,
+        currentEndsAt: previous.revealEndsAt,
+        serverRemainingSec: state.revealRemainingSec,
+        now,
+      }),
+      prepRemainingSec: state.prepRemainingSec,
+      nextPingSec: state.nextPingSec,
+      lastPingAgo: state.lastPingAgo,
+      pingCount: state.pingCount,
+      pingExpiresAt:
+        state.pingExpiresInMs > 0 ? Date.now() + state.pingExpiresInMs : 0,
+      resultWinner: state.resultWinner,
+      center: state.center,
+      nearestHunter: state.nearestHunter,
+      caughtSpots: state.caughtSpots,
+      trail: state.trail,
+      distanceM: state.distanceM,
+      connection: "connected",
+      connectionError: null,
+    });
+  }
+
+  function handleMessage(raw: string): void {
+    let message: ServerMessage;
+    try {
+      message = JSON.parse(raw) as ServerMessage;
+    } catch {
+      return;
+    }
+
+    switch (message.type) {
+      case "state":
+        applySnapshot(message.state);
+        break;
+      case "tick": {
+        // Lightweight countdown update - only update the fields that change
+        const now = Date.now();
+        set({
+          timeLeftSec: message.timeLeftSec,
+          nextPingSec: message.nextPingSec,
+          revealRemainingSec: message.revealRemainingSec,
+          revealEndsAt: message.revealRemainingSec > 0 ? now + message.revealRemainingSec * 1000 : 0,
+          prepRemainingSec: message.prepRemainingSec,
+          pingCount: message.pingCount,
+        });
+        break;
       }
+      case "tagResult":
+        set({
+          tagState: message.tag.result,
+          tagTargetId:
+            message.tag.result === "success" ? message.tag.targetId : null,
+        });
+        break;
+      case "error":
+        set({ actionError: actionError(message.message) });
+        break;
+      default:
+        break;
+    }
+  }
 
-      const hunterCount =
-        shuffled.length <= 1
-          ? shuffled.length
-          : Math.max(1, Math.floor(Math.random() * (shuffled.length - 1)) + 1);
-      const hunterIds = new Set(shuffled.slice(0, hunterCount).map((player) => player.id));
+  function connect(session: LobbySession): void {
+    closeSocket();
+    intentionalClose = false;
+    clearReconnect();
+    let wakeTimer: number | null = window.setTimeout(() => {
+      wakeTimer = null;
+      const state = get();
+      if (state.connection === "connecting") {
+        set({ connection: "waking" });
+      }
+    }, WAKE_TIMEOUT_MS);
 
-      return {
-        players: state.players.map((player) => ({
-          ...player,
-          role: hunterIds.has(player.id) ? "hunter" : "runner",
-        })),
-        tagState: "idle",
-        tagTargetId: null,
-      };
-    }),
-
-  setReady: (ready) =>
-    set((state) => ({
-      players: state.players.map((p) => (p.isYou ? { ...p, ready } : p)),
-    })),
-
-  startGame: () => {
-    const state = get();
-    const hasHunters = state.players.some((player) => player.role === "hunter");
-    const hasRunners = state.players.some((player) => player.role === "runner");
-    if (!hasHunters || !hasRunners) return;
+    const clearWakeTimer = () => {
+      if (wakeTimer !== null) {
+        clearTimeout(wakeTimer);
+        wakeTimer = null;
+      }
+    };
 
     set({
-      phase: "active",
-      players: state.players.map((p) => ({
-        ...p,
-        status: "active",
-        ready: true,
-      })),
-      tagState: "idle",
-      tagTargetId: null,
-      lastPingAgo: 0,
-      nextPingSec: state.settings.pingSec,
-      timeLeftSec: state.settings.durationSec,
-      pingCount: 0,
-      pingExpiresAt: 0,
-      resultWinner: null,
+      session,
+      connection: "connecting",
+      connectionError: null,
+      removalNotice: null,
     });
-  },
 
-  tick: () =>
-    set((state) => {
-      if (state.phase !== "active") return {};
-
-      if (state.timeLeftSec <= 1) {
-        return {
-          timeLeftSec: 0,
-          phase: "ended" as GamePhase,
-          resultWinner: "runners" as Winner,
-        };
-      }
-
-      if (state.nextPingSec <= 1) {
-        return {
-          timeLeftSec: state.timeLeftSec - 1,
-          nextPingSec: state.settings.pingSec,
-          lastPingAgo: 0,
-          pingCount: state.pingCount + 1,
-          pingExpiresAt: Date.now() + 10_000,
-        };
-      }
-
-      return {
-        timeLeftSec: state.timeLeftSec - 1,
-        nextPingSec: state.nextPingSec - 1,
-        lastPingAgo: state.lastPingAgo + 1,
-      };
-    }),
-
-  triggerPing: () =>
-    set((state) => ({
-      nextPingSec: state.settings.pingSec,
-      lastPingAgo: 0,
-      pingCount: state.pingCount + 1,
-      pingExpiresAt: Date.now() + 10_000,
-    })),
-
-  submitTagCode: (rawCode) => {
-    const code = rawCode.replace(/\D/g, "").slice(0, 4);
-    const activeRunners = get().players.filter(
-      (player) => player.role === "runner" && player.status === "active",
-    );
-
-    if (activeRunners.length === 0) {
-      set({ tagState: "no-target", tagTargetId: null });
+    let next: WebSocket;
+    try {
+      next = new WebSocket(websocketUrl(session));
+    } catch {
+      clearWakeTimer();
+      set({
+        connection: "disconnected",
+        connectionError: "Could not open a realtime connection.",
+      });
       return;
     }
+    socket = next;
 
-    const target = activeRunners.find((runner) => runner.tagCode === code);
-    if (!target) {
-      set({ tagState: "invalid", tagTargetId: null });
-      return;
-    }
+    next.addEventListener("open", () => {
+      clearWakeTimer();
+      if (socket !== next) return;
+      reconnectAttempts = 0;
+      set({ connection: "connected", connectionError: null });
+    });
 
-    set((state) => ({
-      tagState: "success",
-      tagTargetId: target.id,
-      players: catchTarget(state.players, target.id),
-    }));
-  },
+    next.addEventListener("message", (event) => {
+      if (socket !== next) return;
+      handleMessage(String(event.data));
+    });
 
-  resetTag: () => set({ tagState: "idle", tagTargetId: null }),
+    next.addEventListener("close", (event) => {
+      clearWakeTimer();
+      if (socket !== next) return;
+      socket = null;
+      if (intentionalClose) {
+        set({ connection: "disconnected" });
+        return;
+      }
+      if (event.code === 4001 || event.code === 1008) {
+        writeSession(null);
+        set({
+          session: null,
+          connection: "disconnected",
+          connectionError:
+            "That lobby is closed or the session expired. Join the lobby again.",
+          players: [],
+          code: "",
+        });
+        return;
+      }
+      if (event.code === 4003) {
+        writeSession(null);
+        set({
+          session: null,
+          connection: "disconnected",
+          connectionError: null,
+          removalNotice: "The host removed you from the game.",
+          players: [],
+          code: "",
+          phase: "lobby",
+        });
+        return;
+      }
 
-  endGame: (winner) =>
-    set((state) => ({
-      phase: "ended",
-      resultWinner: winner,
-      tagState: "idle",
-      players:
-        winner === "hunters"
-          ? state.players.map((p) =>
-              p.role === "runner" ? { ...p, status: "caught" } : p,
-            )
-          : state.players,
-    })),
+      const current = get().session;
+      if (!current) {
+        set({ connection: "disconnected" });
+        return;
+      }
+      reconnectAttempts += 1;
+      const delay = Math.min(5000, 750 * reconnectAttempts);
+      set({
+        connection: reconnectAttempts > 2 ? "disconnected" : "connecting",
+      });
+      reconnectTimer = window.setTimeout(() => {
+        if (get().session) connect(current);
+      }, delay);
+    });
 
-  setDeviceHeading: (deviceHeading) => set({ deviceHeading }),
+    next.addEventListener("error", () => {
+      // The close handler owns reconnection and user-facing errors.
+    });
+  }
 
-  resetGame: () => set({ ...initialState, players: INITIAL_PLAYERS }),
-}));
+  return {
+    ...initialState,
+    draftName: readName(),
+
+    bootstrap: () => {
+      if (bootstrappedOnce) {
+        set({ bootstrapped: true });
+        return;
+      }
+      bootstrappedOnce = true;
+      const session = readSession();
+      set({
+        bootstrapped: true,
+        draftName: readName(),
+        session,
+      });
+      if (session) connect(session);
+    },
+
+    createLobby: async (name, settings) => {
+      const cleanName = name.trim();
+      if (!cleanName) return { ok: false, error: "Add a display name first." };
+      try {
+        const store = get();
+        const center = store.draftArena
+          ? store.draftArena
+          : store.livePosition
+            ? { lat: store.livePosition.lat, lng: store.livePosition.lng }
+            : null;
+        const session = await post<LobbySession>("/api/lobbies", {
+          name: cleanName,
+          settings,
+          center,
+        });
+        writeSession(session);
+        writeName(cleanName.toUpperCase().slice(0, 12));
+        set({
+          ...freshRoundState(),
+          draftName: cleanName.toUpperCase().slice(0, 12),
+          settings,
+        });
+        connect(session);
+        return { ok: true, code: session.code };
+      } catch (error) {
+        return {
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Could not create the lobby.",
+        };
+      }
+    },
+
+    joinLobby: async (rawCode, name) => {
+      const code = rawCode.trim().toUpperCase();
+      const cleanName = name.trim();
+      if (code.length !== 6) {
+        return { ok: false, error: "Enter the full 6-character lobby code." };
+      }
+      if (!cleanName) return { ok: false, error: "Add a display name first." };
+      try {
+        const session = await post<LobbySession>(
+          `/api/lobbies/${encodeURIComponent(code)}/join`,
+          { name: cleanName },
+        );
+        writeSession(session);
+        writeName(cleanName.toUpperCase().slice(0, 12));
+        set({
+          ...freshRoundState(),
+          draftName: cleanName.toUpperCase().slice(0, 12),
+        });
+        connect(session);
+        return { ok: true, code: session.code };
+      } catch (error) {
+        return {
+          ok: false,
+          error:
+            error instanceof Error ? error.message : "Could not join the lobby.",
+        };
+      }
+    },
+
+    leaveLobby: () => {
+      send({ type: "leave" });
+      intentionalClose = true;
+      closeSocket();
+      writeSession(null);
+      set({
+        ...initialState,
+        draftName: get().draftName,
+        locationPermission: get().locationPermission,
+        bootstrapped: true,
+      });
+    },
+
+    setDraftName: (name) => {
+      const clean = name.toUpperCase().slice(0, 12);
+      writeName(clean);
+      set({ draftName: clean });
+    },
+
+    setDraftArena: (center) => {
+      set({ draftArena: center });
+    },
+
+    updateSettings: (settings) => {
+      set((state) => ({ settings: { ...state.settings, ...settings } }));
+      // Only forward live edits to a lobby that is still accepting rule
+      // changes. A stale session from a previous round must never receive
+      // them, otherwise the server rejects the edit and the next lobby looks
+      // locked before it has even started.
+      if (get().session && get().phase === "lobby") {
+        send({ type: "updateSettings", settings });
+      }
+    },
+
+    updateDraftSettings: (settings) => {
+      set((state) => ({ settings: { ...state.settings, ...settings } }));
+    },
+
+    setWaking: (waking) => {
+      set((state) => {
+        if (state.connection === "waking" && !waking) {
+          return { connection: "connecting" };
+        }
+        if (state.connection === "connecting" && waking) {
+          return { connection: "waking" };
+        }
+        return {};
+      });
+    },
+
+    assignPlayerRole: (id, role) => {
+      send({ type: "assignRole", playerId: id, role });
+    },
+
+    randomizeTeams: () => {
+      send({ type: "randomizeTeams" });
+    },
+
+    setReady: (ready) => {
+      send({ type: "setReady", ready });
+    },
+
+    startGame: () => {
+      if (!send({ type: "start" })) {
+        set({ actionError: actionError("Not connected to the lobby.") });
+      }
+    },
+
+    skipPrep: () => {
+      send({ type: "skipPrep" });
+    },
+
+    triggerPing: () => {
+      send({ type: "ping" });
+    },
+
+    submitTagCode: (rawCode) => {
+      const code = rawCode.replace(/\D/g, "").slice(0, 4);
+      if (code.length !== 4) {
+        set({ tagState: "invalid", tagTargetId: null });
+        return;
+      }
+      if (!send({ type: "submitTag", code })) {
+        set({
+          tagState: "idle",
+          actionError: actionError("Not connected to the lobby."),
+        });
+      }
+    },
+
+    resetTag: () => set({ tagState: "idle", tagTargetId: null }),
+
+    endGame: (winner) => {
+      send({ type: "endGame", winner });
+    },
+
+    kickPlayer: (playerId) => {
+      if (!send({ type: "kickPlayer", playerId })) {
+        set({ actionError: actionError("Not connected to the lobby.") });
+      }
+    },
+
+    rematch: () => {
+      if (!send({ type: "rematch" })) {
+        set({ actionError: actionError("Not connected to the lobby.") });
+      }
+    },
+
+    fillBots: (count) => {
+      send({ type: "fillBots", count });
+    },
+
+    removeBots: () => {
+      send({ type: "removeBots" });
+    },
+
+    setDeviceHeading: (deviceHeading) => set({ deviceHeading }),
+
+    updateLocation: (lat, lng, accuracyM) => {
+      send({ type: "updateLocation", lat, lng, accuracyM });
+    },
+
+    setLivePosition: (position) =>
+      set({
+        livePosition: position,
+        positionStatus: "live",
+        positionError: null,
+      }),
+
+    setPositionStatus: (positionStatus, positionError = null) =>
+      set({ positionStatus, positionError }),
+
+    setLocationPermission: (locationPermission) =>
+      set({ locationPermission }),
+
+    requestLocationAccess: () => {
+      if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+        set({
+          locationPermission: "unsupported",
+          positionStatus: "unsupported",
+          positionError: "This browser does not support location access.",
+        });
+        return Promise.resolve(false);
+      }
+      set({ positionStatus: "requesting", positionError: null });
+      return new Promise<boolean>((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (fix) => {
+            const position = {
+              lat: fix.coords.latitude,
+              lng: fix.coords.longitude,
+              accuracyM: Math.round(fix.coords.accuracy),
+              at: fix.timestamp || Date.now(),
+            };
+            set({
+              locationPermission: "granted",
+              livePosition: position,
+              positionStatus: "live",
+              positionError: null,
+            });
+            resolve(true);
+          },
+          (error) => {
+            const denied = error.code === error.PERMISSION_DENIED;
+            set({
+              locationPermission: denied ? "denied" : get().locationPermission,
+              positionStatus: denied ? "denied" : "error",
+              positionError: denied
+                ? "Location permission is blocked. Allow it in your browser settings to appear on the map."
+                : "No GPS fix yet. Move into the open and keep the screen on.",
+            });
+            resolve(false);
+          },
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 15_000 },
+        );
+      });
+    },
+
+    resetGame: () => {
+      get().leaveLobby();
+    },
+
+    dismissReveal: () => {
+      set({ revealEndsAt: 0 });
+    },
+
+    clearRemovalNotice: () => set({ removalNotice: null }),
+
+    clearActionError: () => set({ actionError: null }),
+  };
+});
 
 export const useYou = () => useGame((s) => s.players.find((p) => p.isYou));
 export const useHunters = () =>
   useGame((s) => s.players.filter((p) => p.role === "hunter"));
 export const useRunners = () =>
   useGame((s) => s.players.filter((p) => p.role === "runner"));
+
+/**
+ * Live shrinking-zone state for the active round. Each interval splits into a
+ * hold phase and a contraction phase, so the radius is derived from the round
+ * clock rather than stepped in discrete jumps.
+ */
+export const useZoneState = (): ZoneState => {
+  const settings = useGame((s) => s.settings);
+  const timeLeftSec = useGame((s) => s.timeLeftSec);
+  const phase = useGame((s) => s.phase);
+
+  return useMemo(() => {
+    const elapsedSec =
+      phase === "active" || phase === "ended"
+        ? Math.max(0, settings.durationSec - timeLeftSec)
+        : 0;
+    return computeZoneState(settings, elapsedSec);
+  }, [phase, settings, timeLeftSec]);
+};
