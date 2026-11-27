@@ -5,6 +5,12 @@ import { fileURLToPath } from "node:url";
 import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer } from "ws";
 import { Lobby, createLobbyCode, normalizeName } from "./lobby.ts";
+import {
+  DEFAULT_SPLASH,
+  SPLASH_CODE,
+  SPLASH_MAX_LENGTH,
+  normalizeSplash,
+} from "./splash.ts";
 import type {
   ClientMessage,
   GameSettings,
@@ -32,6 +38,9 @@ const lastActivity = new Map<string, number>();
  */
 const PRESENCE_TTL_MS = 40_000;
 const presence = new Map<string, number>();
+
+/** Editable line beside the logo; resets to the default when the server restarts. */
+let splashText = DEFAULT_SPLASH;
 
 function prunePresence(now = Date.now()): void {
   for (const [id, seenAt] of presence) {
@@ -199,7 +208,26 @@ async function handleApi(
       }
     }
     prunePresence(now);
-    json(response, 200, { online: presence.size });
+    json(response, 200, { online: presence.size, splash: splashText });
+    return true;
+  }
+
+  if (url.pathname === "/api/splash") {
+    if (request.method === "POST") {
+      const body = (await readJson(request)) as {
+        code?: unknown;
+        text?: unknown;
+      };
+      if (String(body.code ?? "") !== SPLASH_CODE) {
+        json(response, 401, { error: "Incorrect access code." });
+        return true;
+      }
+      splashText = normalizeSplash(body.text);
+    }
+    json(response, 200, {
+      text: splashText,
+      maxLength: SPLASH_MAX_LENGTH,
+    });
     return true;
   }
 

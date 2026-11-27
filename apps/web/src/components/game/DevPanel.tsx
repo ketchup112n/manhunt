@@ -28,6 +28,7 @@ import { Slider } from "@/components/ui/FormControls";
 import { useToast } from "@/components/ui/Toast";
 import { useGame, useYou } from "@/store/game";
 import { usePreferences } from "@/store/preferences";
+import { useSplash, SPLASH_MAX_LENGTH } from "@/store/splash";
 import { cn } from "@/lib/cn";
 
 export function DevPanel() {
@@ -37,6 +38,11 @@ export function DevPanel() {
   const [open, setOpen] = useState(false);
   const [codePrompt, setCodePrompt] = useState(false);
   const [enteredCode, setEnteredCode] = useState("");
+  const splash = useSplash((state) => state.text);
+  const setSplashText = useSplash((state) => state.setText);
+  const [splashDraft, setSplashDraft] = useState("");
+  const [savingSplash, setSavingSplash] = useState(false);
+
 
   useEffect(() => {
     if (!codePrompt) return;
@@ -110,10 +116,39 @@ export function DevPanel() {
     if (enteredCode === DEMO_CODE) {
       setCodePrompt(false);
       setEnteredCode("");
+      setSplashDraft(useSplash.getState().text ?? "");
       setOpen(true);
     } else {
       toast("Invalid code", { tone: "danger" });
       setEnteredCode("");
+    }
+  };
+
+  const saveSplash = async () => {
+    setSavingSplash(true);
+    try {
+      const response = await fetch("/api/splash", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: DEMO_CODE, text: splashDraft }),
+      });
+      const data = (await response.json().catch(() => null)) as
+        | { text?: string; error?: string }
+        | null;
+      if (!response.ok || !data?.text) {
+        toast(data?.error ?? "Could not save the splash", { tone: "danger" });
+        return;
+      }
+      setSplashText(data.text);
+      setSplashDraft(data.text);
+      toast(splashDraft.trim() ? "Splash updated" : "Splash reset", {
+        tone: "success",
+        description: "Every open tab picks it up within a few seconds.",
+      });
+    } catch {
+      toast("Could not reach the server", { tone: "danger" });
+    } finally {
+      setSavingSplash(false);
     }
   };
 
@@ -432,6 +467,62 @@ export function DevPanel() {
                 <Sun className="size-3.5" /> Daylight
               </button>
             </div>
+          </section>
+
+          <section>
+            <SectionLabel
+              label="Logo splash"
+              meta={`${splashDraft.length}/${SPLASH_MAX_LENGTH}`}
+            />
+            <div className="rounded-[3px] border border-line bg-surface-2/40 p-3">
+              <input
+                type="text"
+                value={splashDraft}
+                onChange={(event) =>
+                  setSplashDraft(event.target.value.slice(0, SPLASH_MAX_LENGTH))
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void saveSplash();
+                }}
+                maxLength={SPLASH_MAX_LENGTH}
+                placeholder="Text beside the logo"
+                className="w-full rounded-[2px] border border-line bg-canvas/60 px-2.5 py-2 font-display text-[13px] text-ink caret-ink outline-none transition-colors focus:border-runner/50"
+              />
+              <div className="mt-2 flex flex-wrap gap-1">
+                {["Tag fast", "Trust no one", "Stay off the grid"].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setSplashDraft(preset)}
+                    className="rounded-[2px] border border-line bg-canvas/40 px-1.5 py-1 font-mono text-[8px] uppercase tracking-[0.1em] text-faint transition-colors hover:border-runner/40 hover:text-runner"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-line pt-2.5">
+                <span
+                  className={cn(
+                    "font-mono text-[8px] uppercase tracking-[0.1em]",
+                    splash === splashDraft ? "text-faint" : "text-warning",
+                  )}
+                >
+                  {splash === splashDraft ? "Live" : "Unsaved"}
+                </span>
+                <Button
+                  size="sm"
+                  variant="runner"
+                  disabled={savingSplash}
+                  onClick={() => void saveSplash()}
+                >
+                  {savingSplash ? "Saving" : "Save splash"}
+                </Button>
+              </div>
+            </div>
+            <p className="mt-1.5 font-mono text-[8px] uppercase leading-relaxed tracking-[0.1em] text-faint">
+              Empty text restores the default. Hidden on phones, and the free
+              server forgets edits when it restarts.
+            </p>
           </section>
 
           <p className="border-t border-line pt-3 font-mono text-[8px] uppercase leading-relaxed tracking-[0.12em] text-faint">

@@ -375,6 +375,24 @@ input[type="range"].hud-range::-moz-range-thumb {
   }
 }
 
+/* Minecraft-style splash beside the wordmark: rests, then pops every few seconds. */
+@keyframes splash-pulse {
+  0%,
+  84%,
+  100% {
+    transform: rotate(-6deg) scale(1);
+  }
+  88% {
+    transform: rotate(-6deg) scale(1.07);
+  }
+  93% {
+    transform: rotate(-6deg) scale(0.98);
+  }
+  97% {
+    transform: rotate(-6deg) scale(1.02);
+  }
+}
+
 @keyframes drift {
   0% {
     transform: translate3d(0, 0, 0) scale(1);
@@ -436,6 +454,18 @@ input[type="range"].hud-range::-moz-range-thumb {
 
 .animate-flicker {
   animation: flicker 5s linear infinite;
+}
+
+.logo-splash {
+  transform: rotate(-6deg);
+  transform-origin: bottom left;
+  text-shadow: 0 0 20px color-mix(in srgb, var(--runner) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .logo-splash {
+    animation: splash-pulse 7s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  }
 }
 
 .animate-drift {

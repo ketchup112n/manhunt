@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Chip } from "@/components/ui/Chip";
 import { cn } from "@/lib/cn";
 import { usePresence } from "@/store/presence";
+import { useSplash } from "@/store/splash";
 
 /** How often an active tab reports that it is still open. */
 const HEARTBEAT_MS = 15_000;
@@ -43,9 +44,15 @@ export function PresenceSync() {
           keepalive: true,
         });
         if (!response.ok) return;
-        const data = (await response.json()) as { online?: number };
+        const data = (await response.json()) as {
+          online?: number;
+          splash?: string;
+        };
         if (!stopped && typeof data.online === "number") {
           usePresence.getState().setOnline(data.online);
+        }
+        if (!stopped && typeof data.splash === "string" && data.splash) {
+          useSplash.getState().setText(data.splash);
         }
       } catch {
         // Offline or server waking; the next beat retries.

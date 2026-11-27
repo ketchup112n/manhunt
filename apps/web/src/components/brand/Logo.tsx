@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { useSplash } from "@/store/splash";
 
 export function Logo({
   compact,
@@ -7,6 +8,8 @@ export function Logo({
   compact?: boolean;
   className?: string;
 }) {
+  const splash = useSplash((state) => state.text);
+
   return (
     <div className={cn("flex min-w-0 select-none items-center gap-3", className)}>
       <svg
@@ -34,12 +37,20 @@ export function Logo({
           strokeOpacity="0.12"
         />
       </svg>
-      <div className="min-w-0">
+      <div className="relative min-w-0">
         <p className="display truncate whitespace-nowrap text-[22px] font-bold leading-none text-ink">MANHUNT</p>
         {!compact ? (
           <p className="mt-1 hidden font-mono text-[8px] uppercase tracking-[0.28em] text-faint sm:block">
             Real-world pursuit
           </p>
+        ) : null}
+        {!compact && splash ? (
+          <span
+            title={splash}
+            className="logo-splash absolute left-full top-[13px] ml-2 hidden max-w-[7rem] truncate font-display text-[10px] font-semibold uppercase leading-none tracking-[0.06em] text-runner sm:block md:max-w-[14rem] md:text-[11px]"
+          >
+            {splash}
+          </span>
         ) : null}
       </div>
     </div>
